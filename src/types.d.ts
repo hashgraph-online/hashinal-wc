@@ -1,5 +1,5 @@
 import { DAppConnector } from '@hashgraph/hedera-wallet-connect';
-import hashgraph from '@hashgraph/sdk';
+import hashgraph, { PrivateKey } from '@hashgraph/sdk';
 import { ContractFunctionParameters, TransactionReceipt } from '@hashgraph/sdk';
 import { SessionTypes, SignClientTypes } from '@walletconnect/types';
 
@@ -100,7 +100,11 @@ export type HederaWalletConnectSDK = {
     adminKey: string,
     supplyKey: string
   ) => Promise<string>;
-  mintNFT: (tokenId: string, metadata: string) => Promise<TransactionReceipt>;
+  mintNFT: (
+    tokenId: string,
+    metadata: string,
+    supplyKey: PrivateKey
+  ) => Promise<TransactionReceipt>;
   dAppConnector?: DAppConnector;
   getMessages: (
     topicId: string,

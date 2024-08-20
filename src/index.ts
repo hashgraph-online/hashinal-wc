@@ -11,7 +11,6 @@ import {
   TopicId,
   ContractId,
   LedgerId,
-  PrivateKey,
   TokenCreateTransaction,
   TokenType,
   TokenSupplyType,
