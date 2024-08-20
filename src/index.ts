@@ -1,5 +1,5 @@
 import { Buffer } from 'buffer';
-import { SignClientTypes } from '@walletconnect/types';
+import { SessionTypes, SignClientTypes } from '@walletconnect/types';
 import {
   Transaction,
   TransferTransaction,
@@ -20,6 +20,7 @@ import {
   TransactionReceipt,
   ContractFunctionParameters,
 } from '@hashgraph/sdk';
+import * as HashgraphSDK from '@hashgraph/sdk';
 import {
   HederaSessionEvent,
   HederaJsonRpcMethod,
@@ -58,7 +59,7 @@ export async function init(
  * Opens Wallet Connect Modal to start a session.
  * @returns
  */
-export async function connect() {
+export async function connect(): Promise<SessionTypes.Struct> {
   if (!dAppConnector) throw new Error('SDK not initialized');
 
   await dAppConnector.init({ logger: 'error' });
@@ -70,10 +71,15 @@ export async function connect() {
 /**
  * Disconnects from all wallets
  */
-export async function disconnect() {
-  if (!dAppConnector) throw new Error('SDK not initialized');
-  await dAppConnector.disconnectAll();
-  console.log('Disconnected from all wallets');
+export async function disconnect(): Promise<boolean> {
+  try {
+    if (!dAppConnector) throw new Error('SDK not initialized');
+    await dAppConnector.disconnectAll();
+    console.log('Disconnected from all wallets');
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
 
 /**
@@ -359,9 +365,128 @@ async function getMessages(
   }
 }
 
+/**
+ * Helper function to save currently connected account id
+ * @param {string} accountId
+ */
+function saveConnectionInfo(accountId: string) {
+  if (!accountId) {
+    return localStorage.removeItem('connectedAccountId');
+  }
+  localStorage.setItem('connectedAccountId', accountId);
+}
+
+/**
+ * Helper function to get currently connected account id
+ * @returns {string | null}
+ */
+function loadConnectionInfo() {
+  return localStorage.getItem('connectedAccountId');
+}
+
+/**
+ * Helper function to connect to the wallet.
+ * @param {string} PROJECT_ID
+ * @param {SignClientTypes.Metadata} APP_METADATA
+ * @returns {Promise<{ accountId: string; balance: string; session: SessionTypes.Struct }>}
+ */
+async function connectWallet(
+  PROJECT_ID: string,
+  APP_METADATA: SignClientTypes.Metadata
+): Promise<{
+  accountId: string;
+  balance: string;
+  session: SessionTypes.Struct;
+}> {
+  try {
+    const sdk = window?.HederaWalletConnectSDK;
+    await sdk.init(PROJECT_ID, APP_METADATA);
+    const session = await sdk.connect();
+    console.log('Connected session:', session);
+    const accountId = await sdk.getAccountInfo();
+    const balance = await sdk.getAccountBalance();
+    console.log('account info is', accountId, balance);
+
+    saveConnectionInfo(accountId);
+    return {
+      accountId,
+      balance,
+      session,
+    };
+  } catch (error) {
+    console.error('Failed to connect wallet:', error);
+  }
+}
+
+/**
+ * Helper function to disconnect + wipe local storage.
+ * @param {boolean} clearStorage - clear storage on disconnect
+ * @returns {boolean}
+ */
+async function disconnectWallet(
+  clearStorage: boolean = true
+): Promise<boolean> {
+  try {
+    try {
+      const sdk = window?.HederaWalletConnectSDK;
+      const success = await sdk.disconnect();
+
+      if (!success) {
+        return false;
+      }
+
+      if (clearStorage) {
+        localStorage.clear();
+      }
+
+      saveConnectionInfo(undefined);
+      return true;
+    } catch (e) {}
+
+    return true;
+  } catch (error) {
+    console.error('Failed to connect wallet:', error);
+    return false;
+  }
+}
+
+/**
+ * Helper function to init the SDK from localStorage.
+ * @param PROJECT_ID Hedera project id
+ * @param APP_METADATA App Metadata
+ */
+const initAccount = async (
+  PROJECT_ID: string,
+  APP_METADATA: SignClientTypes.Metadata
+): Promise<{ accountId: string; balance: string } | null> => {
+  const savedAccountId = loadConnectionInfo();
+
+  const sdk = window?.HederaWalletConnectSDK;
+  if (savedAccountId) {
+    try {
+      console.log('got connectedAccountId', savedAccountId);
+      await sdk.init(PROJECT_ID, APP_METADATA);
+      const balance = await sdk.getAccountBalance();
+      return {
+        accountId: savedAccountId,
+        balance,
+      }
+    } catch (error) {
+      console.error('Failed to reconnect:', error);
+      localStorage.removeItem('connectedAccountId');
+      return null;
+    }
+  }
+};
+
 // Updated HederaWalletConnectSDK object with new functions
 const HederaWalletConnectSDK: HederaWalletConnectSDK = {
   init,
+  initAccount,
+  disconnectWallet,
+  connectWallet,
+  loadConnectionInfo,
+  saveConnectionInfo,
   connect,
   disconnect,
   submitMessageToTopic,
@@ -374,6 +499,7 @@ const HederaWalletConnectSDK: HederaWalletConnectSDK = {
   mintNFT,
   dAppConnector,
   getMessages,
+  HashgraphSDK,
 };
 
 const run = (): void => {

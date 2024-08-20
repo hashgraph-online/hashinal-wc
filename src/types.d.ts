@@ -1,6 +1,7 @@
 import { DAppConnector } from '@hashgraph/hedera-wallet-connect';
+import hashgraph from '@hashgraph/sdk';
 import { ContractFunctionParameters, TransactionReceipt } from '@hashgraph/sdk';
-import { SignClientTypes } from '@walletconnect/types';
+import { SessionTypes, SignClientTypes } from '@walletconnect/types';
 
 interface Message {
   payer: string;
@@ -55,8 +56,19 @@ export type HederaWalletConnectSDK = {
     projectId: string,
     metadata: SignClientTypes.Metadata
   ) => Promise<DAppConnector>;
-  connect: () => Promise<any>;
-  disconnect: () => Promise<void>;
+  connect: () => Promise<SessionTypes.Struct>;
+  connectWallet(
+    PROJECT_ID: string,
+    APP_METADATA: SignClientTypes.Metadata
+  ): Promise<{
+    accountId: string;
+    balance: string;
+    session: SessionTypes.Struct;
+  }>;
+  disconnect: () => Promise<boolean>;
+  disconnectWallet: () => Promise<boolean>;
+  loadConnectionInfo: () => string | null;
+  saveConnectionInfo: (accountId: string) => void;
   submitMessageToTopic: (
     topicId: string,
     message: string
@@ -97,6 +109,11 @@ export type HederaWalletConnectSDK = {
     disableTimestampFilter?: boolean,
     nextUrl?: string
   ) => Promise<FetchMessagesResult>;
+  initAccount: (
+    PROJECT_ID: string,
+    APP_METADATA: SignClientTypes.Metadata
+  ) => Promise<{ accountId: string; balance: string } | null>;
+  HashgraphSDK: typeof hashgraph;
 };
 
 declare global {

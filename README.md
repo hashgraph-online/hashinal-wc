@@ -15,12 +15,12 @@ This SDK provides a simple interface for interacting with the Hedera Hashgraph u
 
 ## Usage
 
-The script located in the dist folder can be used directly, but it’s primarily intended to be integrated with an inscribed Topic ID via the Recursion SDK. Please note that the Recursion SDK is still under development and isn’t available yet. Once released, the SDK will automatically include this script.
+The script located in the dist folder can be used directly, but it's primarily intended to be integrated with an inscribed Topic ID via the [Recursion SDK](https://github.com/hashgraph-online/hcs-recursion-sdk).
 
-To use this script, ensure that you reference the current version’s Topic ID in your HTML.
+To use this script, ensure that you reference the current version's Topic ID in your HTML.
 
 ```html
-<script data-src="hcs://1/0.0.6662611" data-script-id="wallet-connect"></script>
+<script data-src="hcs://1/0.0.6790163" data-script-id="wallet-connect"></script>
 ```
 
 Later in your code, access the SDK.
@@ -60,7 +60,7 @@ Submits a message to the specified Hedera topic.
 
 Transfers HBAR between accounts.
 
-### `executeSmartContract(contractId: string, functionName: string, parameters: any[], gas: number = 100000)`
+### `executeSmartContract(contractId: string, functionName: string, parameters: ContractFunctionParameters, gas: number = 100000)`
 
 Executes a function on a smart contract.
 
@@ -88,11 +88,23 @@ Mints a new NFT for the specified token.
 
 Retrieves messages from a specified topic.
 
+### `connectWallet(PROJECT_ID: string, APP_METADATA: SignClientTypes.Metadata)`
+
+Helper function to connect to the wallet.
+
+### `disconnectWallet(clearStorage: boolean = true)`
+
+Helper function to disconnect and optionally wipe local storage.
+
+### `initAccount(PROJECT_ID: string, APP_METADATA: SignClientTypes.Metadata)`
+
+Helper function to initialize the SDK from localStorage.
+
 ## Versions and Topic IDs
 
 | Version | Topic ID    |
 | ------- | ----------- |
-| v0.0.1  | 0.0.6662611 |
+| v0.0.1  | 0.0.6790163 |
 
 ## Contributing
 
