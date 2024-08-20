@@ -19,6 +19,7 @@ import {
   TopicCreateTransaction,
   TransactionReceipt,
   ContractFunctionParameters,
+  PrivateKey,
 } from '@hashgraph/sdk';
 import * as HashgraphSDK from '@hashgraph/sdk';
 import {
@@ -100,14 +101,23 @@ export const executeTransaction = async (tx: Transaction) => {
  * Submits a new message to a Topic Id
  * @param {string} topicId
  * @param {string} message
+ * @param {string} submitKey
  * @returns {Promise<TransactionReceipt>}
  */
-export async function submitMessageToTopic(topicId: string, message: string) {
+export async function submitMessageToTopic(
+  topicId: string,
+  message: string,
+  submitKey?: PrivateKey
+) {
   if (!dAppConnector) throw new Error('SDK not initialized');
 
-  const transaction = new TopicMessageSubmitTransaction()
+  let transaction = new TopicMessageSubmitTransaction()
     .setTopicId(TopicId.fromString(topicId))
     .setMessage(message);
+
+  if (submitKey) {
+    transaction = await transaction.sign(submitKey);
+  }
 
   return executeTransaction(transaction);
 }
@@ -253,16 +263,23 @@ export async function createToken(
 ) {
   if (!dAppConnector) throw new Error('SDK not initialized');
 
-  const transaction = new TokenCreateTransaction()
+  let transaction = new TokenCreateTransaction()
     .setTokenName(name)
     .setTokenSymbol(symbol)
     .setDecimals(decimals)
     .setInitialSupply(initialSupply)
     .setTreasuryAccountId(AccountId.fromString(treasuryAccountId))
-    .setAdminKey(PrivateKey.fromString(adminKey))
-    .setSupplyKey(PrivateKey.fromString(supplyKey))
     .setTokenType(TokenType.NonFungibleUnique)
     .setSupplyType(TokenSupplyType.Finite);
+
+  if (supplyKey) {
+    transaction = transaction.setSupplyKey(PrivateKey.fromString(supplyKey));
+  }
+
+  if (adminKey) {
+    transaction = transaction.setAdminKey(PrivateKey.fromString(adminKey));
+    transaction = await transaction.sign(PrivateKey.fromString(adminKey));
+  }
 
   const receipt = await executeTransaction(transaction);
   return receipt.tokenId.toString();
@@ -276,13 +293,15 @@ export async function createToken(
  */
 export async function mintNFT(
   tokenId: string,
-  metadata: string
+  metadata: string,
+  supplyKey: PrivateKey
 ): Promise<TransactionReceipt> {
   if (!dAppConnector) throw new Error('SDK not initialized');
 
-  const transaction = new TokenMintTransaction()
+  let transaction = await new TokenMintTransaction()
     .setTokenId(tokenId)
-    .setMetadata([Buffer.from(metadata, 'utf-8')]);
+    .setMetadata([Buffer.from(metadata, 'utf-8')])
+    .sign(supplyKey);
 
   return await executeTransaction(transaction);
 }
@@ -470,7 +489,7 @@ const initAccount = async (
       return {
         accountId: savedAccountId,
         balance,
-      }
+      };
     } catch (error) {
       console.error('Failed to reconnect:', error);
       localStorage.removeItem('connectedAccountId');
