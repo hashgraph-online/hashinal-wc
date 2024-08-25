@@ -1,0 +1,39 @@
+# Source files
+src/
+
+# TypeScript config
+tsconfig.json
+
+# Test files
+test/
+*.test.js
+*.spec.js
+
+# Development config files
+.eslintrc
+.prettierrc
+.editorconfig
+
+# Git related
+.git/
+.gitignore
+
+# CI/CD
+.travis.yml
+.gitlab-ci.yml
+.github/
+
+# Logs
+*.log
+
+# Dependencies
+node_modules/
+
+# IDE specific files
+.vscode/
+.idea/
+
+# Miscellaneous
+.DS_Store
+*.tmp
+*.temp

@@ -19,6 +19,12 @@ import {
   TransactionReceipt,
   ContractFunctionParameters,
   PrivateKey,
+  AccountCreateTransaction,
+  TokenAssociateTransaction,
+  TokenDissociateTransaction,
+  AccountUpdateTransaction,
+  AccountAllowanceApproveTransaction,
+  TokenId,
 } from '@hashgraph/sdk';
 import * as HashgraphSDK from '@hashgraph/sdk';
 import {
@@ -27,503 +33,572 @@ import {
   DAppConnector,
   HederaChainId,
 } from '@hashgraph/hedera-wallet-connect';
-import { FetchMessagesResult, HederaWalletConnectSDK, Message } from './types';
+import { Message, FetchMessagesResult, TokenBalance } from './types';
+import { DefaultLogger, ILogger } from './logger/logger';
 
-let dAppConnector: DAppConnector | undefined;
+class HashinalsWalletConnectSDK {
+  private static instance: HashinalsWalletConnectSDK;
+  private dAppConnector: DAppConnector | undefined;
+  private logger: ILogger;
+  private network: LedgerId;
 
-/**
- * Starts the DAppConnector, without opening a modal.
- * @param projectId
- * @param metadata
- * @returns {DAppConnector}
- */
-export async function init(
-  projectId: string,
-  metadata: SignClientTypes.Metadata
-) {
-  dAppConnector = new DAppConnector(
-    metadata,
-    LedgerId.MAINNET,
-    projectId,
-    Object.values(HederaJsonRpcMethod),
-    [HederaSessionEvent.ChainChanged, HederaSessionEvent.AccountsChanged],
-    [HederaChainId.Mainnet]
-  );
-
-  await dAppConnector.init({ logger: 'error' });
-  console.log('Hedera Wallet Connect SDK initialized');
-  return dAppConnector;
-}
-
-/**
- * Opens Wallet Connect Modal to start a session.
- * @returns
- */
-export async function connect(): Promise<SessionTypes.Struct> {
-  if (!dAppConnector) throw new Error('SDK not initialized');
-
-  await dAppConnector.init({ logger: 'error' });
-  const session = await dAppConnector.openModal();
-  console.log('Connected to wallet:', session);
-  return session;
-}
-
-/**
- * Disconnects from all wallets
- */
-export async function disconnect(): Promise<boolean> {
-  try {
-    if (!dAppConnector) throw new Error('SDK not initialized');
-    await dAppConnector.disconnectAll();
-    console.log('Disconnected from all wallets');
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
-
-/**
- * Executes a Transaction.
- * @param {Transaction} tx
- * @returns {Promise<TransactionResponse>}
- */
-export const executeTransaction = async (tx: Transaction) => {
-  if (!dAppConnector) throw new Error('SDK not initialized');
-  const signer = dAppConnector.signers[0];
-  const signedTx = await tx.freezeWithSigner(signer);
-  const exectedTx = await signedTx.executeWithSigner(signer);
-  return await exectedTx.getReceiptWithSigner(signer);
-};
-
-/**
- *
- * Submits a new message to a Topic Id
- * @param {string} topicId
- * @param {string} message
- * @param {string} submitKey
- * @returns {Promise<TransactionReceipt>}
- */
-export async function submitMessageToTopic(
-  topicId: string,
-  message: string,
-  submitKey?: PrivateKey
-) {
-  if (!dAppConnector) throw new Error('SDK not initialized');
-
-  let transaction = new TopicMessageSubmitTransaction()
-    .setTopicId(TopicId.fromString(topicId))
-    .setMessage(message);
-
-  if (submitKey) {
-    transaction = await transaction.sign(submitKey);
+  constructor(logger?: ILogger, network?: LedgerId) {
+    this.logger = logger || new DefaultLogger();
+    this.network = network || LedgerId.MAINNET;
   }
 
-  return executeTransaction(transaction);
-}
-
-/**
- * Transfers HBAR from one Account Id to another.
- * @param {string} fromAccountId
- * @param {string} toAccountId
- * @param {number} amount
- * @returns {Promise<TransactionReceipt>}
- */
-export async function transferHbar(
-  fromAccountId: string,
-  toAccountId: string,
-  amount: number
-) {
-  if (!dAppConnector) throw new Error('SDK not initialized');
-
-  const transaction = new TransferTransaction()
-    .setTransactionId(TransactionId.generate(fromAccountId))
-    .addHbarTransfer(AccountId.fromString(fromAccountId), new Hbar(-amount))
-    .addHbarTransfer(AccountId.fromString(toAccountId), new Hbar(amount));
-
-  return executeTransaction(transaction);
-}
-
-/**
- * Execute a smart contract given an id, name and params.
- * @param contractId
- * @param functionName
- * @param parameters
- * @param gas
- * @returns
- */
-export async function executeSmartContract(
-  contractId: string,
-  functionName: string,
-  parameters: ContractFunctionParameters,
-  gas: number = 100000
-) {
-  if (!dAppConnector) throw new Error('SDK not initialized');
-
-  const transaction = new ContractExecuteTransaction()
-    .setContractId(ContractId.fromString(contractId))
-    .setGas(gas)
-    .setFunction(functionName, parameters);
-
-  return await executeTransaction(transaction);
-}
-
-/**
- * Fetch an Account Id
- * @param {string} account
- * @returns {any}
- */
-const requestAccount = async (account: string) => {
-  try {
-    const url = `https://mainnet-public.mirrornode.hedera.com/api/v1/accounts/${account}`;
-    const req = await fetch(url);
-    const res = await req.json();
-    return res;
-  } catch (e) {
-    console.log(e);
+  static getInstance(
+    logger?: ILogger,
+    network?: LedgerId
+  ): HashinalsWalletConnectSDK {
+    if (!HashinalsWalletConnectSDK.instance) {
+      HashinalsWalletConnectSDK.instance = new HashinalsWalletConnectSDK(
+        logger,
+        network
+      );
+    }
+    return HashinalsWalletConnectSDK.instance;
   }
-};
 
-/**
- * Gets the current account balance, formatted.
- * @returns {string}
- */
-export async function getAccountBalance() {
-  if (!dAppConnector) throw new Error('SDK not initialized');
-  const account = await getAccountInfo();
-  const accountResponse = await requestAccount(account);
-  if (!accountResponse) {
-    throw new Error(
-      'Failed to fetch account. Try again or check if the Account ID is valid.'
+  setLogger(logger: ILogger): void {
+    this.logger = logger;
+  }
+
+  setLogLevel(level: 'error' | 'warn' | 'info' | 'debug'): void {
+    if (this.logger instanceof DefaultLogger) {
+      this.logger.setLogLevel(level);
+    } else {
+      this.logger.warn('setLogLevel is only available for the default logger');
+    }
+  }
+
+  async init(
+    projectId: string,
+    metadata: SignClientTypes.Metadata,
+    network?: LedgerId
+  ): Promise<DAppConnector> {
+    this.dAppConnector = new DAppConnector(
+      metadata,
+      network || this.network,
+      projectId,
+      Object.values(HederaJsonRpcMethod),
+      [HederaSessionEvent.ChainChanged, HederaSessionEvent.AccountsChanged],
+      [
+        network === LedgerId.MAINNET
+          ? HederaChainId.Mainnet
+          : HederaChainId.Testnet,
+      ]
     );
-  }
-  const balance = (await accountResponse?.balance?.balance) / 10 ** 8;
-  return Number(balance).toLocaleString('en-US');
-}
 
-/**
- * Gets the current Account Id authenticated with Wallet Connect
- * @returns {string}
- */
-export async function getAccountInfo() {
-  if (!dAppConnector) throw new Error('SDK not initialized');
-  const signer = dAppConnector.signers[0];
-  return signer.getAccountId().toString();
-}
-
-/**
- * Function to create a new topic, with optional admin and submit keys
- * @param {string} memo
- * @param {string} adminKey
- * @param {string} submitKey
- * @returns {string} topicId
- */
-export async function createTopic(
-  memo?: string,
-  adminKey?: string,
-  submitKey?: string
-) {
-  if (!dAppConnector) throw new Error('SDK not initialized');
-
-  let transaction = new TopicCreateTransaction().setTopicMemo(memo);
-
-  if (adminKey) {
-    const adminWithPrivateKey = PrivateKey.fromString(adminKey);
-    transaction.setAdminKey(adminWithPrivateKey.publicKey);
-    transaction = await transaction.sign(adminWithPrivateKey);
+    await this.dAppConnector.init({ logger: 'error' });
+    this.logger.info('Hedera Wallet Connect SDK initialized');
+    return this.dAppConnector;
   }
 
-  if (submitKey) {
-    transaction.setSubmitKey(PrivateKey.fromString(submitKey).publicKey);
+  async connect(): Promise<SessionTypes.Struct> {
+    this.ensureInitialized();
+    await this.dAppConnector!.init({ logger: 'error' });
+    const session = await this.dAppConnector!.openModal();
+    return session;
   }
 
-  const receipt = await executeTransaction(transaction);
-  return receipt.topicId.toString();
-}
-
-/**
- * Create a new Token ID
- * @param name
- * @param symbol
- * @param initialSupply
- * @param decimals
- * @param treasuryAccountId
- * @param adminKey
- * @param supplyKey
- * @returns {Promise<TransactionReceipt>}
- */
-export async function createToken(
-  name: string,
-  symbol: string,
-  initialSupply: number,
-  decimals: number,
-  treasuryAccountId: string,
-  adminKey: string,
-  supplyKey: string
-) {
-  if (!dAppConnector) throw new Error('SDK not initialized');
-
-  let transaction = new TokenCreateTransaction()
-    .setTokenName(name)
-    .setTokenSymbol(symbol)
-    .setDecimals(decimals)
-    .setInitialSupply(initialSupply)
-    .setTreasuryAccountId(AccountId.fromString(treasuryAccountId))
-    .setTokenType(TokenType.NonFungibleUnique)
-    .setSupplyType(TokenSupplyType.Finite);
-
-  if (supplyKey) {
-    transaction = transaction.setSupplyKey(PrivateKey.fromString(supplyKey));
+  async disconnect(): Promise<boolean> {
+    try {
+      this.ensureInitialized();
+      await this.dAppConnector!.disconnectAll();
+      this.logger.info('Disconnected from all wallets');
+      return true;
+    } catch (e) {
+      this.logger.error('Failed to disconnect', e);
+      return false;
+    }
   }
 
-  if (adminKey) {
-    transaction = transaction.setAdminKey(PrivateKey.fromString(adminKey));
-    transaction = await transaction.sign(PrivateKey.fromString(adminKey));
+  private async executeTransaction(
+    tx: Transaction
+  ): Promise<TransactionReceipt> {
+    this.ensureInitialized();
+    const signer = this.dAppConnector!.signers[0];
+    const signedTx = await tx.freezeWithSigner(signer);
+    const executedTx = await signedTx.executeWithSigner(signer);
+    return await executedTx.getReceiptWithSigner(signer);
   }
 
-  const receipt = await executeTransaction(transaction);
-  return receipt.tokenId.toString();
-}
+  async submitMessageToTopic(
+    topicId: string,
+    message: string,
+    submitKey?: PrivateKey
+  ): Promise<TransactionReceipt> {
+    this.ensureInitialized();
 
-/**
- * Mint a new serial number onto a Token Id.
- * @param {string} tokenId
- * @param {string} metadata
- * @returns {Promise<TransactionReceipt>}
- */
-export async function mintNFT(
-  tokenId: string,
-  metadata: string,
-  supplyKey: PrivateKey
-): Promise<TransactionReceipt> {
-  if (!dAppConnector) throw new Error('SDK not initialized');
+    let transaction = new TopicMessageSubmitTransaction()
+      .setTopicId(TopicId.fromString(topicId))
+      .setMessage(message);
 
-  let transaction = await new TokenMintTransaction()
-    .setTokenId(tokenId)
-    .setMetadata([Buffer.from(metadata, 'utf-8')])
-    .sign(supplyKey);
+    if (submitKey) {
+      transaction = await transaction.sign(submitKey);
+    }
 
-  return await executeTransaction(transaction);
-}
+    return this.executeTransaction(transaction);
+  }
 
-/**
- * Retrieves all messages for a Topic Id.
- * @param topicId
- * @param collectedMessages
- * @param lastTimestamp
- * @param disableTimestampFilter
- * @param nextUrl
- * @returns
- */
-async function getMessages(
-  topicId: string,
-  collectedMessages: Message[],
-  lastTimestamp?: number,
-  disableTimestampFilter: boolean = false,
-  nextUrl?: string
-): Promise<FetchMessagesResult> {
-  const baseUrl = 'https://mainnet-public.mirrornode.hedera.com';
-  const timestampQuery =
-    lastTimestamp && !disableTimestampFilter
-      ? `&timestamp=gt:${lastTimestamp}`
-      : '';
+  async transferHbar(
+    fromAccountId: string,
+    toAccountId: string,
+    amount: number
+  ): Promise<TransactionReceipt> {
+    this.ensureInitialized();
 
-  const url = nextUrl
-    ? `${baseUrl}${nextUrl}`
-    : `${baseUrl}/api/v1/topics/${topicId}/messages?limit=200${timestampQuery}`;
+    const transaction = new TransferTransaction()
+      .setTransactionId(TransactionId.generate(fromAccountId))
+      .addHbarTransfer(AccountId.fromString(fromAccountId), new Hbar(-amount))
+      .addHbarTransfer(AccountId.fromString(toAccountId), new Hbar(amount));
 
-  try {
-    const response = await fetch(url);
-    const data = await response.json();
-    const messages = data?.messages || [];
-    const nextLink = data?.links?.next;
+    return this.executeTransaction(transaction);
+  }
 
-    for (const msg of messages) {
-      try {
+  async executeSmartContract(
+    contractId: string,
+    functionName: string,
+    parameters: ContractFunctionParameters,
+    gas: number = 100000
+  ): Promise<TransactionReceipt> {
+    this.ensureInitialized();
+
+    const transaction = new ContractExecuteTransaction()
+      .setContractId(ContractId.fromString(contractId))
+      .setGas(gas)
+      .setFunction(functionName, parameters);
+
+    return this.executeTransaction(transaction);
+  }
+
+  private async requestAccount(account: string): Promise<any> {
+    try {
+      const url = `https://${
+        this.network === LedgerId.MAINNET ? 'mainnet-public' : 'testnet'
+      }.mirrornode.hedera.com/api/v1/accounts/${account}`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
+    } catch (e) {
+      this.logger.error('Failed to fetch account', e);
+      throw e;
+    }
+  }
+
+  async getAccountBalance(): Promise<string> {
+    this.ensureInitialized();
+    const account = await this.getAccountInfo();
+    const accountResponse = await this.requestAccount(account);
+    if (!accountResponse) {
+      throw new Error(
+        'Failed to fetch account. Try again or check if the Account ID is valid.'
+      );
+    }
+    const balance = accountResponse.balance.balance / 10 ** 8;
+    return Number(balance).toLocaleString('en-US');
+  }
+
+  async getAccountInfo(): Promise<string> {
+    this.ensureInitialized();
+    const signer = this.dAppConnector!.signers[0];
+    return signer.getAccountId().toString();
+  }
+
+  async createTopic(
+    memo?: string,
+    adminKey?: string,
+    submitKey?: string
+  ): Promise<string> {
+    this.ensureInitialized();
+
+    let transaction = new TopicCreateTransaction().setTopicMemo(memo || '');
+
+    if (adminKey) {
+      const adminWithPrivateKey = PrivateKey.fromString(adminKey);
+      transaction.setAdminKey(adminWithPrivateKey.publicKey);
+      transaction = await transaction.sign(adminWithPrivateKey);
+    }
+
+    if (submitKey) {
+      transaction.setSubmitKey(PrivateKey.fromString(submitKey).publicKey);
+    }
+
+    const receipt = await this.executeTransaction(transaction);
+    return receipt.topicId!.toString();
+  }
+
+  async createToken(
+    name: string,
+    symbol: string,
+    initialSupply: number,
+    decimals: number,
+    treasuryAccountId: string,
+    adminKey: string,
+    supplyKey: string
+  ): Promise<string> {
+    this.ensureInitialized();
+
+    let transaction = new TokenCreateTransaction()
+      .setTokenName(name)
+      .setTokenSymbol(symbol)
+      .setDecimals(decimals)
+      .setInitialSupply(initialSupply)
+      .setTreasuryAccountId(AccountId.fromString(treasuryAccountId))
+      .setTokenType(TokenType.NonFungibleUnique)
+      .setSupplyType(TokenSupplyType.Finite);
+
+    if (supplyKey) {
+      transaction = transaction.setSupplyKey(PrivateKey.fromString(supplyKey));
+    }
+
+    if (adminKey) {
+      transaction = transaction.setAdminKey(PrivateKey.fromString(adminKey));
+      transaction = await transaction.sign(PrivateKey.fromString(adminKey));
+    }
+
+    const receipt = await this.executeTransaction(transaction);
+    return receipt.tokenId!.toString();
+  }
+
+  async mintNFT(
+    tokenId: string,
+    metadata: string,
+    supplyKey: PrivateKey
+  ): Promise<TransactionReceipt> {
+    this.ensureInitialized();
+
+    let transaction = await new TokenMintTransaction()
+      .setTokenId(tokenId)
+      .setMetadata([Buffer.from(metadata, 'utf-8')])
+      .sign(supplyKey);
+
+    return this.executeTransaction(transaction);
+  }
+
+  async getMessages(
+    topicId: string,
+    lastTimestamp?: number,
+    disableTimestampFilter: boolean = false
+  ): Promise<FetchMessagesResult> {
+    const baseUrl = `https://${
+      this.network === LedgerId.MAINNET ? 'mainnet-public' : 'testnet'
+    }.mirrornode.hedera.com`;
+    const timestampQuery =
+      Number(lastTimestamp) > 0 && !disableTimestampFilter
+        ? `&timestamp=gt:${lastTimestamp}`
+        : '';
+
+    const url = `${baseUrl}/api/v1/topics/${topicId}/messages?limit=200${timestampQuery}`;
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      const messages = data?.messages || [];
+      const nextLink = data?.links?.next;
+
+      const collectedMessages: Message[] = messages.map((msg: any) => {
         const parsedMessage = JSON.parse(atob(msg.message));
-        parsedMessage.payer = msg.payer_account_id;
-        collectedMessages.push({
+        return {
           ...parsedMessage,
+          payer: msg.payer_account_id,
           created: new Date(Number(msg.consensus_timestamp) * 1000),
           consensus_timestamp: msg.consensus_timestamp,
           sequence_number: msg.sequence_number,
-        });
-      } catch (jsonError) {
-        console.error('Failed to process JSON:', jsonError);
-        return {
-          messages: collectedMessages,
-          error: 'Failed to process JSON',
         };
-      }
-    }
+      });
 
-    if (nextLink) {
-      return await getMessages(
-        topicId,
-        collectedMessages,
-        Number(
-          collectedMessages[collectedMessages.length - 1]?.consensus_timestamp
+      if (nextLink) {
+        const nextResult = await this.getMessages(
+          topicId,
+          Number(
+            collectedMessages[collectedMessages.length - 1]?.consensus_timestamp
+          ),
+          disableTimestampFilter
+        );
+        collectedMessages.push(...nextResult.messages);
+      }
+
+      return {
+        messages: collectedMessages.sort(
+          (a, b) => a.sequence_number - b.sequence_number
         ),
-        disableTimestampFilter,
-        nextLink
-      );
+        error: '',
+      };
+    } catch (error) {
+      this.logger.error('Error fetching topic data:', error);
+      return {
+        messages: [],
+        error: error.toString(),
+      };
     }
-
-    return {
-      messages: collectedMessages.sort(
-        (a, b) => a.sequence_number - b.sequence_number
-      ),
-      error: '',
-    };
-  } catch (networkError) {
-    console.error('Error fetching topic data:', networkError);
-    return {
-      messages: collectedMessages,
-      error: networkError.toString(),
-    };
   }
-}
 
-/**
- * Helper function to save currently connected account id
- * @param {string} accountId
- */
-function saveConnectionInfo(accountId: string) {
-  if (!accountId) {
-    return localStorage.removeItem('connectedAccountId');
+  saveConnectionInfo(accountId: string | undefined): void {
+    if (!accountId) {
+      localStorage.removeItem('connectedAccountId');
+    } else {
+      localStorage.setItem('connectedAccountId', accountId);
+    }
   }
-  localStorage.setItem('connectedAccountId', accountId);
-}
 
-/**
- * Helper function to get currently connected account id
- * @returns {string | null}
- */
-function loadConnectionInfo() {
-  return localStorage.getItem('connectedAccountId');
-}
-
-/**
- * Helper function to connect to the wallet.
- * @param {string} PROJECT_ID
- * @param {SignClientTypes.Metadata} APP_METADATA
- * @returns {Promise<{ accountId: string; balance: string; session: SessionTypes.Struct }>}
- */
-async function connectWallet(
-  PROJECT_ID: string,
-  APP_METADATA: SignClientTypes.Metadata
-): Promise<{
-  accountId: string;
-  balance: string;
-  session: SessionTypes.Struct;
-}> {
-  try {
-    const sdk = window?.HederaWalletConnectSDK;
-    await sdk.init(PROJECT_ID, APP_METADATA);
-    const session = await sdk.connect();
-    console.log('Connected session:', session);
-    const accountId = await sdk.getAccountInfo();
-    const balance = await sdk.getAccountBalance();
-    console.log('account info is', accountId, balance);
-
-    saveConnectionInfo(accountId);
-    return {
-      accountId,
-      balance,
-      session,
-    };
-  } catch (error) {
-    console.error('Failed to connect wallet:', error);
+  loadConnectionInfo(): string | null {
+    return localStorage.getItem('connectedAccountId');
   }
-}
 
-/**
- * Helper function to disconnect + wipe local storage.
- * @param {boolean} clearStorage - clear storage on disconnect
- * @returns {boolean}
- */
-async function disconnectWallet(
-  clearStorage: boolean = true
-): Promise<boolean> {
-  try {
+  async connectWallet(
+    PROJECT_ID: string,
+    APP_METADATA: SignClientTypes.Metadata
+  ): Promise<{
+    accountId: string;
+    balance: string;
+    session: SessionTypes.Struct;
+  }> {
     try {
-      const sdk = window?.HederaWalletConnectSDK;
-      const success = await sdk.disconnect();
+      await this.init(PROJECT_ID, APP_METADATA);
+      const session = await this.connect();
 
-      if (!success) {
-        return false;
-      }
+      const accountId = await this.getAccountInfo();
+      const balance = await this.getAccountBalance();
 
-      if (clearStorage) {
+      this.saveConnectionInfo(accountId);
+      return {
+        accountId,
+        balance,
+        session,
+      };
+    } catch (error) {
+      this.logger.error('Failed to connect wallet:', error);
+      throw error;
+    }
+  }
+
+  async disconnectWallet(clearStorage: boolean = true): Promise<boolean> {
+    try {
+      const success = await this.disconnect();
+
+      if (success && clearStorage) {
         localStorage.clear();
       }
 
-      saveConnectionInfo(undefined);
-      return true;
-    } catch (e) {}
+      this.saveConnectionInfo(undefined);
+      return success;
+    } catch (error) {
+      this.logger.error('Failed to disconnect wallet:', error);
+      return false;
+    }
+  }
 
-    return true;
-  } catch (error) {
-    console.error('Failed to connect wallet:', error);
-    return false;
+  async initAccount(
+    PROJECT_ID: string,
+    APP_METADATA: SignClientTypes.Metadata
+  ): Promise<{ accountId: string; balance: string } | null> {
+    const savedAccountId = this.loadConnectionInfo();
+
+    if (savedAccountId) {
+      try {
+        await this.init(PROJECT_ID, APP_METADATA);
+        const balance = await this.getAccountBalance();
+        return {
+          accountId: savedAccountId,
+          balance,
+        };
+      } catch (error) {
+        this.logger.error('Failed to reconnect:', error);
+        localStorage.removeItem('connectedAccountId');
+        return null;
+      }
+    }
+    return null;
+  }
+
+  private ensureInitialized(): void {
+    if (!this.dAppConnector) {
+      throw new Error('SDK not initialized. Call init() first.');
+    }
+  }
+
+  static run(): void {
+    if (typeof window !== 'undefined') {
+      (window as any).HashinalsWalletConnectSDK =
+        HashinalsWalletConnectSDK.getInstance();
+    }
+  }
+
+  async transferToken(
+    tokenId: string,
+    fromAccountId: string,
+    toAccountId: string,
+    amount: number
+  ): Promise<TransactionReceipt> {
+    this.ensureInitialized();
+
+    const transaction = new TransferTransaction()
+      .setTransactionId(TransactionId.generate(fromAccountId))
+      .addTokenTransfer(
+        TokenId.fromString(tokenId),
+        AccountId.fromString(fromAccountId),
+        -amount
+      )
+      .addTokenTransfer(
+        TokenId.fromString(tokenId),
+        AccountId.fromString(toAccountId),
+        amount
+      );
+
+    return this.executeTransaction(transaction);
+  }
+
+  async createAccount(initialBalance: number): Promise<TransactionReceipt> {
+    this.ensureInitialized();
+
+    const transaction = new AccountCreateTransaction().setInitialBalance(
+      new Hbar(initialBalance)
+    );
+
+    return this.executeTransaction(transaction);
+  }
+
+  async associateTokenToAccount(
+    accountId: string,
+    tokenId: string
+  ): Promise<TransactionReceipt> {
+    this.ensureInitialized();
+
+    const transaction = new TokenAssociateTransaction()
+      .setAccountId(AccountId.fromString(accountId))
+      .setTokenIds([TokenId.fromString(tokenId)]);
+
+    return this.executeTransaction(transaction);
+  }
+
+  async dissociateTokenFromAccount(
+    accountId: string,
+    tokenId: string
+  ): Promise<TransactionReceipt> {
+    this.ensureInitialized();
+
+    const transaction = new TokenDissociateTransaction()
+      .setAccountId(AccountId.fromString(accountId))
+      .setTokenIds([TokenId.fromString(tokenId)]);
+
+    return this.executeTransaction(transaction);
+  }
+
+  async updateAccount(
+    accountId: string,
+    maxAutomaticTokenAssociations: number
+  ): Promise<TransactionReceipt> {
+    this.ensureInitialized();
+
+    const transaction = new AccountUpdateTransaction()
+      .setAccountId(AccountId.fromString(accountId))
+      .setMaxAutomaticTokenAssociations(maxAutomaticTokenAssociations);
+
+    return this.executeTransaction(transaction);
+  }
+
+  async approveAllowance(
+    spenderAccountId: string,
+    tokenId: string,
+    amount: number,
+    ownerAccountId: string
+  ): Promise<TransactionReceipt> {
+    this.ensureInitialized();
+
+    const transaction =
+      new AccountAllowanceApproveTransaction().approveTokenAllowance(
+        TokenId.fromString(tokenId),
+        AccountId.fromString(ownerAccountId),
+        AccountId.fromString(spenderAccountId),
+        amount
+      );
+
+    return this.executeTransaction(transaction);
+  }
+
+  async getAccountTokens(
+    accountId: string
+  ): Promise<{ tokens: TokenBalance[] }> {
+    this.ensureInitialized();
+
+    const baseUrl = `https://${
+      this.network === LedgerId.MAINNET ? 'mainnet-public' : 'testnet'
+    }.mirrornode.hedera.com`;
+    const url = `${baseUrl}/api/v1/accounts/${accountId}/tokens?limit=200`;
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+
+      const tokens: TokenBalance[] = [];
+
+      for (const token of data.tokens) {
+        if (token.token_id) {
+          tokens.push({
+            tokenId: token.token_id,
+            balance: token.balance,
+            decimals: token.decimals,
+            formatted_balance: (
+              token.balance /
+              10 ** token.decimals
+            ).toLocaleString('en-US'),
+            created_timestamp: new Date(Number(token.created_timestamp) * 1000),
+          });
+        }
+      }
+      let nextLink = data.links?.next;
+      while (nextLink) {
+        const nextUrl = `${baseUrl}${nextLink}`;
+        const nextResponse = await fetch(nextUrl);
+        if (!nextResponse.ok) {
+          throw new Error(`HTTP error! status: ${nextResponse.status}`);
+        }
+        const nextData = await nextResponse.json();
+
+        for (const token of nextData.tokens) {
+          if (token.token_id) {
+            tokens.push({
+              tokenId: token.token_id,
+              balance: token.balance,
+              decimals: token.decimals,
+              formatted_balance: (
+                token.balance /
+                10 ** token.decimals
+              ).toLocaleString('en-US'),
+              created_timestamp: new Date(
+                Number(token.created_timestamp) * 1000
+              ),
+            });
+          }
+        }
+
+        nextLink = nextData.links?.next;
+      }
+
+      return { tokens };
+    } catch (error) {
+      this.logger.error('Error fetching account tokens:', error);
+      throw error;
+    }
   }
 }
 
-/**
- * Helper function to init the SDK from localStorage.
- * @param PROJECT_ID Hedera project id
- * @param APP_METADATA App Metadata
- */
-const initAccount = async (
-  PROJECT_ID: string,
-  APP_METADATA: SignClientTypes.Metadata
-): Promise<{ accountId: string; balance: string } | null> => {
-  const savedAccountId = loadConnectionInfo();
+// This variable is replaced at build time.
+// @ts-ignore
+const isUMD = 'VITE_BUILD_FORMAT' === 'umd';
+if (isUMD) {
+  console.log('Auto-initializing HashinalsWalletConnectSDK.');
+  HashinalsWalletConnectSDK.run();
+}
 
-  const sdk = window?.HederaWalletConnectSDK;
-  if (savedAccountId) {
-    try {
-      console.log('got connectedAccountId', savedAccountId);
-      await sdk.init(PROJECT_ID, APP_METADATA);
-      const balance = await sdk.getAccountBalance();
-      return {
-        accountId: savedAccountId,
-        balance,
-      };
-    } catch (error) {
-      console.error('Failed to reconnect:', error);
-      localStorage.removeItem('connectedAccountId');
-      return null;
-    }
-  }
-};
-
-// Updated HederaWalletConnectSDK object with new functions
-const HederaWalletConnectSDK: HederaWalletConnectSDK = {
-  init,
-  initAccount,
-  disconnectWallet,
-  connectWallet,
-  loadConnectionInfo,
-  saveConnectionInfo,
-  connect,
-  disconnect,
-  submitMessageToTopic,
-  transferHbar,
-  executeSmartContract,
-  getAccountBalance,
-  getAccountInfo,
-  createTopic,
-  createToken,
-  mintNFT,
-  dAppConnector,
-  getMessages,
-  HashgraphSDK,
-};
-
-const run = (): void => {
-  window.HederaWalletConnectSDK = HederaWalletConnectSDK;
-};
-
-run();
-
-export default HederaWalletConnectSDK;
+export { HashinalsWalletConnectSDK, HashgraphSDK };

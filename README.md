@@ -1,6 +1,8 @@
-# Hedera Wallet Connect SDK
+# Hashinals WalletConnect SDK
 
-This SDK provides a simple interface for interacting with the Hedera Hashgraph using WalletConnect. It allows developers to easily integrate Hedera functionality into inscribed HTML files by injecting the SDK into the window. It is not meant for usage in a traditional non-inscribed dApp.
+This SDK provides a simple interface for interacting with the Hedera Hashgraph using WalletConnect. It allows developers to easily integrate Hedera functionality into inscribed HTML files by injecting the SDK into the window.
+
+This SDK can be utilized as a module through NPM, or recursively imported in an inscribed HTML file.
 
 ## Features
 
@@ -12,6 +14,24 @@ This SDK provides a simple interface for interacting with the Hedera Hashgraph u
 - Mint NFTs
 - Fetch account balance and information
 - Retrieve messages from a topic
+- Transfer tokens between accounts
+- Create accounts
+- Associate tokens with accounts
+- Dissociate tokens from accounts
+- Update account properties
+- Approve token allowances
+
+## Installation
+
+Skip this step if you're using the SDK in an inscribed HTML file.
+
+```bash
+npm install @hashgraphonline/hashinals-wc
+```
+
+```javascript
+ import { HashinalsWalletConnectSDK } from '@hashgraphonline/hashinals-wc';
+```
 
 ## Usage
 
@@ -20,91 +40,206 @@ The script located in the dist folder can be used directly, but it's primarily i
 To use this script, ensure that you reference the current version's Topic ID in your HTML.
 
 ```html
-<script data-src="hcs://1/0.0.6790163" data-script-id="wallet-connect"></script>
+<script data-src="hcs://1/0.0.6843009" data-script-id="wallet-connect"></script>
 ```
 
 Later in your code, access the SDK.
 
 ```javascript
-// Initialize the SDK
-await window.HederaWalletConnectSDK.init(projectId, metadata);
-
-// Connect to a wallet
-const session = await HederaWalletConnectSDK.connect();
+// Connect the user's wallet and store their Account Id in local storage in a single step.
+    const { balance, accountId } = await sdk.connectWallet(
+      PROJECT_ID,
+      APP_METADATA
+    );
 
 // Use various SDK functions
-await HederaWalletConnectSDK.submitMessageToTopic(topicId, message);
-await HederaWalletConnectSDK.transferHbar(fromAccountId, toAccountId, amount);
+await HashinalsWalletConnectSDK.submitMessageToTopic(topicId, message);
+await HashinalsWalletConnectSDK.transferHbar(fromAccountId, toAccountId, amount);
 // ... and more
 ```
 
 ## SDK Reference
 
-### `init(projectId: string, metadata: SignClientTypes.Metadata)`
+### `init(projectId: string, metadata: SignClientTypes.Metadata, network?: LedgerId)`
 
-Initializes the SDK with the given project ID and metadata. Ensure you've registered your project using the official WalletConnect website.
+Initializes the SDK with the given project ID, metadata, and optional network selection.
+
+```javascript
+await window.HashinalsWalletConnectSDK.init(
+  "your-project-id",
+  {
+    name: "Your dApp",
+    description: "Your dApp description",
+    url: "https://yourdapp.com",
+    icons: ["https://yourdapp.com/icon.png"]
+  },
+  LedgerId.TESTNET
+);
+```
 
 ### `connect()`
 
-Opens the WalletConnect modal and establishes a connection.
+Opens the WalletConnect modal for users to connect their wallet.
+
+```javascript
+const session = await window.HashinalsWalletConnectSDK.connect();
+```
 
 ### `disconnect()`
 
 Disconnects from all connected wallets.
 
-### `submitMessageToTopic(topicId: string, message: string)`
+```javascript
+await window.HashinalsWalletConnectSDK.disconnect();
+```
 
-Submits a message to the specified Hedera topic.
+### `submitMessageToTopic(topicId: string, message: string, submitKey?: PrivateKey)`
+
+Submits a message to a specified Hedera topic.
+
+```javascript
+await window.HashinalsWalletConnectSDK.submitMessageToTopic('0.0.1234567', 'Hello, Hedera!');
+```
 
 ### `transferHbar(fromAccountId: string, toAccountId: string, amount: number)`
 
-Transfers HBAR between accounts.
+Transfers HBAR from one account to another.
+
+```javascript
+await window.HashinalsWalletConnectSDK.transferHbar('0.0.1234567', '0.0.7890123', 10);
+```
 
 ### `executeSmartContract(contractId: string, functionName: string, parameters: ContractFunctionParameters, gas: number = 100000)`
 
 Executes a function on a smart contract.
 
+```javascript
+const parameters = [
+  { type: 'string', value: 'Hello, Hedera!' }
+];
+await window.HashinalsWalletConnectSDK.executeSmartContract('0.0.1234567', 'hello', parameters);
+```
+
 ### `getAccountBalance()`
 
-Retrieves the balance of the connected account.
+Retrieves the HBAR balance of the connected account.
+
+```javascript
+const balance = await window.HashinalsWalletConnectSDK.getAccountBalance();
+console.log(`Account balance: ${balance}`);
+```
 
 ### `getAccountInfo()`
 
-Retrieves information about the connected account.
+Fetches the account ID of the connected wallet.
+
+```javascript
+const accountId = await window.HashinalsWalletConnectSDK.getAccountInfo();
+console.log(`Account ID: ${accountId}`);
+```
 
 ### `createTopic(memo?: string, adminKey?: string, submitKey?: string)`
 
 Creates a new topic on the Hedera network.
 
+```javascript
+await window.HashinalsWalletConnectSDK.createTopic('My new topic', '0.0.1234567', '0.0.7890123');
+```
+
 ### `createToken(name: string, symbol: string, initialSupply: number, decimals: number, treasuryAccountId: string, adminKey: string, supplyKey: string)`
 
 Creates a new token on the Hedera network.
 
-### `mintNFT(tokenId: string, metadata: string)`
+```javascript
+await window.HashinalsWalletConnectSDK.createToken('My Token', 'MYT', 1000000, 2, '0.0.1234567', '0.0.1234567', '0.0.7890123');
+```
 
-Mints a new NFT for the specified token.
+### `mintNFT(tokenId: string, metadata: string, supplyKey: PrivateKey)`
 
-### `getMessages(topicId: string, collectedMessages: Message[], lastTimestamp?: number, disableTimestampFilter: boolean = false, nextUrl?: string)`
+Mints a new NFT for an existing token.
 
-Retrieves messages from a specified topic.
+```javascript
+const metadata = JSON.stringify({
+  name: 'My NFT',
+  description: 'This is my NFT',
+  image: 'https://example.com/nft.jpg'
+});
+await window.HashinalsWalletConnectSDK.mintNFT('0.0.1234567', metadata, '0.0.7890123');
+```
 
-### `connectWallet(PROJECT_ID: string, APP_METADATA: SignClientTypes.Metadata)`
+### `getMessages(topicId: string, lastTimestamp?: number, disableTimestampFilter: boolean = false)`
 
-Helper function to connect to the wallet.
+Retrieves messages from a specific Hedera topic.
 
-### `disconnectWallet(clearStorage: boolean = true)`
+```javascript
+const messages = await window.HashinalsWalletConnectSDK.getMessages('0.0.1234567');
+console.log(messages);
+```
 
-Helper function to disconnect and optionally wipe local storage.
+### `transferToken(tokenId: string, fromAccountId: string, toAccountId: string, amount: number)`
 
-### `initAccount(PROJECT_ID: string, APP_METADATA: SignClientTypes.Metadata)`
+Transfers tokens between accounts.
 
-Helper function to initialize the SDK from localStorage.
+```javascript
+await window.HashinalsWalletConnectSDK.transferToken('0.0.1234567', '0.0.1234567', '0.0.7890123', 10);
+```
+
+### `createAccount(initialBalance: number)`
+
+Creates a new account on the Hedera network.
+
+```javascript
+await window.HashinalsWalletConnectSDK.createAccount(100);
+```
+
+### `associateTokenToAccount(accountId: string, tokenId: string)`
+
+Associates a token with an account.
+
+```javascript
+await window.HashinalsWalletConnectSDK.associateTokenToAccount('0.0.1234567', '0.0.7890123');
+```
+
+### `dissociateTokenFromAccount(accountId: string, tokenId: string)`
+
+Removes a token association from an account.
+
+```javascript
+await window.HashinalsWalletConnectSDK.dissociateTokenFromAccount('0.0.1234567', '0.0.7890123');
+```
+
+### `updateAccount(accountId: string, maxAutomaticTokenAssociations: number)`
+
+Updates an account's properties.
+
+```javascript
+await window.HashinalsWalletConnectSDK.updateAccount('0.0.1234567', 10);
+```
+
+### `approveAllowance(spenderAccountId: string, tokenId: string, amount: number, ownerAccountId: string)`
+
+Approves an allowance for token spending.
+
+```javascript
+await window.HashinalsWalletConnectSDK.approveAllowance('0.0.1234567', '0.0.7890123', 10, '0.0.1234567');
+```
+
+### `getAccountTokens(accountId: string)`
+
+Retrieves all tokens associated with an account.
+
+```javascript
+const tokens = await window.HashinalsWalletConnectSDK.getAccountTokens('0.0.1234567');
+console.log(tokens);
+```
 
 ## Versions and Topic IDs
+Version 1.0.4 and onward correlate with the NPM Package version.
 
-| Version | Topic ID    |
-| ------- | ----------- |
-| v0.0.1  | 0.0.6790163 |
+| Version | Topic ID    | Type |
+| ------- | ----------- | ----------- |
+| v0.0.1  | 0.0.6790163 | UMD |
+| v1.0.4  | 0.0.6843009 | UMD |
 
 ## Contributing
 

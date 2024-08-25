@@ -3,7 +3,7 @@ import hashgraph, { PrivateKey } from '@hashgraph/sdk';
 import { ContractFunctionParameters, TransactionReceipt } from '@hashgraph/sdk';
 import { SessionTypes, SignClientTypes } from '@walletconnect/types';
 
-interface Message {
+export interface Message {
   payer: string;
   created: Date;
   consensus_timestamp: string;
@@ -11,12 +11,12 @@ interface Message {
   [key: string]: any;
 }
 
-interface FetchMessagesResult {
+export interface FetchMessagesResult {
   messages: Message[];
   error?: string;
 }
 
-interface Account {
+export interface Account {
   account: string;
   alias: null;
   auto_renew_period: number;
@@ -51,7 +51,17 @@ export interface Key {
   key: string;
 }
 
-export type HederaWalletConnectSDK = {
+export interface TokenBalance {
+  tokenId: string;
+  balance: string;
+  decimals: number;
+  created_timestamp: Date;
+  formatted_balance: string;
+}
+
+
+export type HashinalsWalletConnectSDK = {
+  run: () => void;
   init: (
     projectId: string,
     metadata: SignClientTypes.Metadata
@@ -122,6 +132,8 @@ export type HederaWalletConnectSDK = {
 
 declare global {
   interface Window {
-    HederaWalletConnectSDK: HederaWalletConnectSDK;
+    HashinalsWalletConnectSDK: HashinalsWalletConnectSDK;
   }
 }
+
+declare const __UMD__: boolean;
