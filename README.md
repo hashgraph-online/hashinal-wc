@@ -46,11 +46,12 @@ To use this script, ensure that you reference the current version's Topic ID in 
 Later in your code, access the SDK.
 
 ```javascript
+const sdk = window.HashinalsWalletConnectSDK;
 // Connect the user's wallet and store their Account Id in local storage in a single step.
-    const { balance, accountId } = await sdk.connectWallet(
-      PROJECT_ID,
-      APP_METADATA
-    );
+const { balance, accountId } = await sdk.connectWallet(
+    PROJECT_ID,
+    APP_METADATA
+);
 
 // Use various SDK functions
 await HashinalsWalletConnectSDK.submitMessageToTopic(topicId, message);
