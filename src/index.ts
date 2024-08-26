@@ -205,9 +205,8 @@ class HashinalsWalletConnectSDK {
   }
 
   async getAccountInfo(): Promise<string> {
-    this.ensureInitialized();
-    const signer = this.dAppConnector!.signers[0];
-    return signer.getAccountId().toString();
+    const signer = this?.dAppConnector?.signers?.[0];
+    return signer?.getAccountId()?.toString();
   }
 
   async createTopic(
