@@ -116,7 +116,7 @@ class HashinalsWalletConnectSDK {
     }
   }
 
-  private async executeTransaction(
+  public async executeTransaction(
     tx: Transaction
   ): Promise<TransactionReceipt> {
     this.ensureInitialized();

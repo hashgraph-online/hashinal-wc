@@ -1,5 +1,5 @@
 import { SessionTypes, SignClientTypes } from '@walletconnect/types';
-import { LedgerId, TransactionReceipt, ContractFunctionParameters, PrivateKey } from '@hashgraph/sdk';
+import { Transaction, LedgerId, TransactionReceipt, ContractFunctionParameters, PrivateKey } from '@hashgraph/sdk';
 import * as HashgraphSDK from '@hashgraph/sdk';
 import { DAppConnector } from '@hashgraph/hedera-wallet-connect';
 import { FetchMessagesResult, TokenBalance } from './types';
@@ -16,7 +16,7 @@ declare class HashinalsWalletConnectSDK {
     init(projectId: string, metadata: SignClientTypes.Metadata, network?: LedgerId): Promise<DAppConnector>;
     connect(): Promise<SessionTypes.Struct>;
     disconnect(): Promise<boolean>;
-    private executeTransaction;
+    executeTransaction(tx: Transaction): Promise<TransactionReceipt>;
     submitMessageToTopic(topicId: string, message: string, submitKey?: PrivateKey): Promise<TransactionReceipt>;
     transferHbar(fromAccountId: string, toAccountId: string, amount: number): Promise<TransactionReceipt>;
     executeSmartContract(contractId: string, functionName: string, parameters: ContractFunctionParameters, gas?: number): Promise<TransactionReceipt>;
