@@ -6,7 +6,7 @@ import { FetchMessagesResult, TokenBalance } from './types';
 import { ILogger } from './logger/logger';
 declare class HashinalsWalletConnectSDK {
     private static instance;
-    private dAppConnector;
+    dAppConnector: DAppConnector | undefined;
     private logger;
     private network;
     constructor(logger?: ILogger, network?: LedgerId);
@@ -16,7 +16,7 @@ declare class HashinalsWalletConnectSDK {
     init(projectId: string, metadata: SignClientTypes.Metadata, network?: LedgerId): Promise<DAppConnector>;
     connect(): Promise<SessionTypes.Struct>;
     disconnect(): Promise<boolean>;
-    executeTransaction(tx: Transaction): Promise<TransactionReceipt>;
+    executeTransaction(tx: Transaction, disableSigner?: boolean): Promise<TransactionReceipt>;
     submitMessageToTopic(topicId: string, message: string, submitKey?: PrivateKey): Promise<TransactionReceipt>;
     transferHbar(fromAccountId: string, toAccountId: string, amount: number): Promise<TransactionReceipt>;
     executeSmartContract(contractId: string, functionName: string, parameters: ContractFunctionParameters, gas?: number): Promise<TransactionReceipt>;

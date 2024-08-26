@@ -38,7 +38,7 @@ import { DefaultLogger, ILogger } from './logger/logger';
 
 class HashinalsWalletConnectSDK {
   private static instance: HashinalsWalletConnectSDK;
-  private dAppConnector: DAppConnector | undefined;
+  public dAppConnector: DAppConnector | undefined;
   private logger: ILogger;
   private network: LedgerId;
 
@@ -78,18 +78,14 @@ class HashinalsWalletConnectSDK {
     network?: LedgerId
   ): Promise<DAppConnector> {
     const chosenNetwork = network || this.network;
- 
+
     this.dAppConnector = new DAppConnector(
       metadata,
       chosenNetwork,
       projectId,
       Object.values(HederaJsonRpcMethod),
       [HederaSessionEvent.ChainChanged, HederaSessionEvent.AccountsChanged],
-      [
-        chosenNetwork
-          ? HederaChainId.Mainnet
-          : HederaChainId.Testnet,
-      ]
+      [chosenNetwork ? HederaChainId.Mainnet : HederaChainId.Testnet]
     );
 
     await this.dAppConnector.init({ logger: 'error' });
@@ -117,13 +113,19 @@ class HashinalsWalletConnectSDK {
   }
 
   public async executeTransaction(
-    tx: Transaction
+    tx: Transaction,
+    disableSigner: boolean = false
   ): Promise<TransactionReceipt> {
     this.ensureInitialized();
     const signer = this.dAppConnector!.signers[0];
-    const signedTx = await tx.freezeWithSigner(signer);
-    const executedTx = await signedTx.executeWithSigner(signer);
-    return await executedTx.getReceiptWithSigner(signer);
+    if (!disableSigner) {
+      const signedTx = await tx.freezeWithSigner(signer);
+      const executedTx = await signedTx.executeWithSigner(signer);
+      return await executedTx.getReceiptWithSigner(signer);
+    } else {
+      const executedTx = await tx.executeWithSigner(signer);
+      return await executedTx.getReceiptWithSigner(signer);
+    }
   }
 
   async submitMessageToTopic(
