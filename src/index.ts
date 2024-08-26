@@ -77,14 +77,16 @@ class HashinalsWalletConnectSDK {
     metadata: SignClientTypes.Metadata,
     network?: LedgerId
   ): Promise<DAppConnector> {
+    const chosenNetwork = network || this.network;
+ 
     this.dAppConnector = new DAppConnector(
       metadata,
-      network || this.network,
+      chosenNetwork,
       projectId,
       Object.values(HederaJsonRpcMethod),
       [HederaSessionEvent.ChainChanged, HederaSessionEvent.AccountsChanged],
       [
-        network === LedgerId.MAINNET
+        chosenNetwork
           ? HederaChainId.Mainnet
           : HederaChainId.Testnet,
       ]
@@ -335,7 +337,7 @@ class HashinalsWalletConnectSDK {
       this.logger.error('Error fetching topic data:', error);
       return {
         messages: [],
-        error: error.toString(),
+        error: (error as Error).toString(),
       };
     }
   }
@@ -354,14 +356,15 @@ class HashinalsWalletConnectSDK {
 
   async connectWallet(
     PROJECT_ID: string,
-    APP_METADATA: SignClientTypes.Metadata
+    APP_METADATA: SignClientTypes.Metadata,
+    network?: LedgerId
   ): Promise<{
     accountId: string;
     balance: string;
     session: SessionTypes.Struct;
   }> {
     try {
-      await this.init(PROJECT_ID, APP_METADATA);
+      await this.init(PROJECT_ID, APP_METADATA, network);
       const session = await this.connect();
 
       const accountId = await this.getAccountInfo();

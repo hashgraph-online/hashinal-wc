@@ -3,12 +3,7 @@ import { LedgerId, TransactionReceipt, ContractFunctionParameters, PrivateKey } 
 import * as HashgraphSDK from '@hashgraph/sdk';
 import { DAppConnector } from '@hashgraph/hedera-wallet-connect';
 import { FetchMessagesResult, TokenBalance } from './types';
-export interface ILogger {
-    error(message: string, ...args: any[]): void;
-    warn(message: string, ...args: any[]): void;
-    info(message: string, ...args: any[]): void;
-    debug(message: string, ...args: any[]): void;
-}
+import { ILogger } from './logger/logger';
 declare class HashinalsWalletConnectSDK {
     private static instance;
     private dAppConnector;
@@ -34,7 +29,7 @@ declare class HashinalsWalletConnectSDK {
     getMessages(topicId: string, lastTimestamp?: number, disableTimestampFilter?: boolean): Promise<FetchMessagesResult>;
     saveConnectionInfo(accountId: string | undefined): void;
     loadConnectionInfo(): string | null;
-    connectWallet(PROJECT_ID: string, APP_METADATA: SignClientTypes.Metadata): Promise<{
+    connectWallet(PROJECT_ID: string, APP_METADATA: SignClientTypes.Metadata, network?: LedgerId): Promise<{
         accountId: string;
         balance: string;
         session: SessionTypes.Struct;
