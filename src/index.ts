@@ -196,6 +196,11 @@ class HashinalsWalletConnectSDK {
   async getAccountBalance(): Promise<string> {
     this.ensureInitialized();
     const account = await this.getAccountInfo();
+
+    if (!account) {
+      return null;
+    }
+
     const accountResponse = await this.requestAccount(account);
     if (!accountResponse) {
       throw new Error(
@@ -207,7 +212,19 @@ class HashinalsWalletConnectSDK {
   }
 
   async getAccountInfo(): Promise<string> {
-    const signer = this?.dAppConnector?.signers?.[0];
+    let signer = this?.dAppConnector?.signers?.[0];
+
+    if (!signer) {
+      const cachedAccountId = this.loadConnectionInfo();
+      if (!cachedAccountId) {
+        return null;
+      }
+      const cachedSigner = this.dAppConnector.getSigner(
+        AccountId.fromString(cachedAccountId)
+      );
+      console.log('cachedSigner', cachedSigner);
+      signer = cachedSigner;
+    }
     return signer?.getAccountId()?.toString();
   }
 
