@@ -78,25 +78,31 @@ class HashinalsWalletConnectSDK {
     network?: LedgerId
   ): Promise<DAppConnector> {
     const chosenNetwork = network || this.network;
-
+    const isMainnet = chosenNetwork.toString() === 'mainnet';
     this.dAppConnector = new DAppConnector(
       metadata,
       chosenNetwork,
       projectId,
       Object.values(HederaJsonRpcMethod),
       [HederaSessionEvent.ChainChanged, HederaSessionEvent.AccountsChanged],
-      [chosenNetwork ? HederaChainId.Mainnet : HederaChainId.Testnet]
+      [isMainnet ? HederaChainId.Mainnet : HederaChainId.Testnet]
     );
 
     await this.dAppConnector.init({ logger: 'error' });
-    this.logger.info('Hedera Wallet Connect SDK initialized');
+
+    this.dAppConnector.onSessionIframeCreated = (session) => {
+      this.handleNewSession(session);
+    };
+    this.logger.info(
+      `Hedera Wallet Connect SDK initialized on ${chosenNetwork}`
+    );
     return this.dAppConnector;
   }
 
   async connect(): Promise<SessionTypes.Struct> {
     this.ensureInitialized();
-    await this.dAppConnector!.init({ logger: 'error' });
-    const session = await this.dAppConnector!.openModal();
+    const session = await this.dAppConnector.openModal();
+    this.handleNewSession(session);
     return session;
   }
 
@@ -117,7 +123,10 @@ class HashinalsWalletConnectSDK {
     disableSigner: boolean = false
   ): Promise<TransactionReceipt> {
     this.ensureInitialized();
-    const signer = this.dAppConnector!.signers[0];
+    const accountId = await this.getAccountInfo();
+    const signer = this.dAppConnector.signers.find(
+      (signer_) => signer_.getAccountId().toString() === accountId
+    );
     if (!disableSigner) {
       const signedTx = await tx.freezeWithSigner(signer);
       const executedTx = await signedTx.executeWithSigner(signer);
@@ -125,6 +134,67 @@ class HashinalsWalletConnectSDK {
     } else {
       const executedTx = await tx.executeWithSigner(signer);
       return await executedTx.getReceiptWithSigner(signer);
+    }
+  }
+
+  public async executeTransactionWithErrorHandling(
+    tx: Transaction,
+    disableSigner: boolean
+  ): Promise<{ result?: TransactionReceipt; error?: string }> {
+    try {
+      const result = await this.executeTransaction(tx, disableSigner);
+      return {
+        result,
+        error: undefined,
+      };
+    } catch (e) {
+      const error = e as Error;
+      const message = error.message?.toLowerCase();
+      this.logger.error('Failed to execute transaction', e);
+      this.logger.error('Failure reason for transaction is', message);
+      if (message.includes('insufficient payer balance')) {
+        return {
+          result: undefined,
+          error: 'Insufficient balance to complete the transaction.',
+        };
+      } else if (message.includes('reject')) {
+        return {
+          result: undefined,
+          error: 'You rejected the transaction',
+        };
+      } else if (message.includes('invalid signature')) {
+        return {
+          result: undefined,
+          error: 'Invalid signature. Please check your account and try again.',
+        };
+      } else if (message.includes('transaction expired')) {
+        return {
+          result: undefined,
+          error: 'Transaction expired. Please try again.',
+        };
+      } else if (message.includes('account not found')) {
+        return {
+          result: undefined,
+          error:
+            'Account not found. Please check the account ID and try again.',
+        };
+      } else if (message.includes('unauthorized')) {
+        return {
+          result: undefined,
+          error:
+            'Unauthorized. You may not have the necessary permissions for this action.',
+        };
+      } else if (message.includes('busy')) {
+        return {
+          result: undefined,
+          error: 'The network is busy. Please try again later.',
+        };
+      } else if (message.includes('invalid transaction')) {
+        return {
+          result: undefined,
+          error: 'Invalid transaction. Please check your inputs and try again.',
+        };
+      }
     }
   }
 
@@ -177,6 +247,17 @@ class HashinalsWalletConnectSDK {
     return this.executeTransaction(transaction);
   }
 
+  private handleNewSession(session: SessionTypes.Struct) {
+    const sessionAccount = session.namespaces?.hedera?.accounts?.[0];
+    const accountId = sessionAccount?.split(':').pop();
+    if (!accountId) {
+      console.error('No account id found in the session');
+      return;
+    } else {
+      this.saveConnectionInfo(accountId);
+    }
+  }
+
   private async requestAccount(account: string): Promise<any> {
     try {
       const url = `https://${
@@ -195,7 +276,7 @@ class HashinalsWalletConnectSDK {
 
   async getAccountBalance(): Promise<string> {
     this.ensureInitialized();
-    const account = await this.getAccountInfo();
+    const account = this.getAccountInfo();
 
     if (!account) {
       return null;
@@ -211,21 +292,16 @@ class HashinalsWalletConnectSDK {
     return Number(balance).toLocaleString('en-US');
   }
 
-  async getAccountInfo(): Promise<string> {
-    let signer = this?.dAppConnector?.signers?.[0];
-
-    if (!signer) {
-      const cachedAccountId = this.loadConnectionInfo();
-      if (!cachedAccountId) {
-        return null;
-      }
-      const cachedSigner = this.dAppConnector.getSigner(
-        AccountId.fromString(cachedAccountId)
-      );
-      console.log('cachedSigner', cachedSigner);
-      signer = cachedSigner;
+  getAccountInfo(): string {
+    const cachedAccountId = this.loadConnectionInfo();
+    if (!cachedAccountId) {
+      return null;
     }
-    return signer?.getAccountId()?.toString();
+    this.logger.info(`Getting signer for ${cachedAccountId}`);
+    const cachedSigner = this.dAppConnector.signers.find(
+      (signer_) => signer_.getAccountId().toString() === cachedAccountId
+    );
+    return cachedSigner?.getAccountId()?.toString();
   }
 
   async createTopic(
@@ -618,7 +694,6 @@ class HashinalsWalletConnectSDK {
 // @ts-ignore
 const isUMD = 'VITE_BUILD_FORMAT' === 'umd';
 if (isUMD) {
-  console.log('Auto-initializing HashinalsWalletConnectSDK.');
   HashinalsWalletConnectSDK.run();
 }
 

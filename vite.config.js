@@ -1,19 +1,22 @@
 import { defineConfig } from 'vite';
 import path from 'path';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
-import StringReplace from 'vite-plugin-string-replace'
+import StringReplace from 'vite-plugin-string-replace';
 
 export default defineConfig(({ mode }) => {
   const format = process.env.BUILD_FORMAT || 'es';
   const outputDir = format === 'umd' ? 'dist/umd' : 'dist/es';
 
-  console.log('format is', format);
   return {
-    plugins: [nodePolyfills(),StringReplace([
-      {
+    plugins: [
+      nodePolyfills(),
+      StringReplace([
+        {
           search: 'VITE_BUILD_FORMAT', // search this string in content
           replace: format, // replace search string with this
-      }])],
+        },
+      ]),
+    ],
     build: {
       outDir: outputDir,
       lib: {
@@ -35,7 +38,7 @@ export default defineConfig(({ mode }) => {
       sourcemap: true,
     },
     define: {
-      'VITE_BUILD_FORMAT': JSON.stringify(format),
+      VITE_BUILD_FORMAT: JSON.stringify(format),
     },
     resolve: {
       alias: {

@@ -17,12 +17,17 @@ declare class HashinalsWalletConnectSDK {
     connect(): Promise<SessionTypes.Struct>;
     disconnect(): Promise<boolean>;
     executeTransaction(tx: Transaction, disableSigner?: boolean): Promise<TransactionReceipt>;
+    executeTransactionWithErrorHandling(tx: Transaction, disableSigner: boolean): Promise<{
+        result?: TransactionReceipt;
+        error?: string;
+    }>;
     submitMessageToTopic(topicId: string, message: string, submitKey?: PrivateKey): Promise<TransactionReceipt>;
     transferHbar(fromAccountId: string, toAccountId: string, amount: number): Promise<TransactionReceipt>;
     executeSmartContract(contractId: string, functionName: string, parameters: ContractFunctionParameters, gas?: number): Promise<TransactionReceipt>;
+    private handleNewSession;
     private requestAccount;
     getAccountBalance(): Promise<string>;
-    getAccountInfo(): Promise<string>;
+    getAccountInfo(): string;
     createTopic(memo?: string, adminKey?: string, submitKey?: string): Promise<string>;
     createToken(name: string, symbol: string, initialSupply: number, decimals: number, treasuryAccountId: string, adminKey: string, supplyKey: string): Promise<string>;
     mintNFT(tokenId: string, metadata: string, supplyKey: PrivateKey): Promise<TransactionReceipt>;

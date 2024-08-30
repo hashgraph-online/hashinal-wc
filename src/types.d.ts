@@ -1,5 +1,5 @@
 import { DAppConnector } from '@hashgraph/hedera-wallet-connect';
-import hashgraph, { PrivateKey } from '@hashgraph/sdk';
+import hashgraph, { PrivateKey, Transaction } from '@hashgraph/sdk';
 import { ContractFunctionParameters, TransactionReceipt } from '@hashgraph/sdk';
 import { SessionTypes, SignClientTypes } from '@walletconnect/types';
 
@@ -59,7 +59,6 @@ export interface TokenBalance {
   formatted_balance: string;
 }
 
-
 export type HashinalsWalletConnectSDK = {
   run: () => void;
   init: (
@@ -79,6 +78,14 @@ export type HashinalsWalletConnectSDK = {
   disconnectWallet: () => Promise<boolean>;
   loadConnectionInfo: () => string | null;
   saveConnectionInfo: (accountId: string) => void;
+  executeTransaction: (
+    tx: Transaction,
+    disableSigner: boolean
+  ) => Promise<TransactionReceipt>;
+  executeTransationWithErrorHandling: (
+    tx: Transaction,
+    disableSigner: boolean
+  ) => Promise<{ result?: TransactionReceipt; error?: string }>;
   submitMessageToTopic: (
     topicId: string,
     message: string
@@ -95,7 +102,7 @@ export type HashinalsWalletConnectSDK = {
     gas?: number
   ) => Promise<TransactionReceipt>;
   getAccountBalance: () => Promise<string>;
-  getAccountInfo: () => Promise<string>;
+  getAccountInfo: () => string;
   createTopic: (
     memo?: string,
     adminKey?: string,
@@ -127,6 +134,32 @@ export type HashinalsWalletConnectSDK = {
     PROJECT_ID: string,
     APP_METADATA: SignClientTypes.Metadata
   ) => Promise<{ accountId: string; balance: string } | null>;
+  transferToken: (
+    tokenId: string,
+    fromAccountId: string,
+    toAccountId: string,
+    amount: number
+  ) => Promise<TransactionReceipt>;
+  createAccount: (initialBalance: number) => Promise<TransactionReceipt>;
+  associateTokenToAccount: (
+    accountId: string,
+    tokenId: string
+  ) => Promise<TransactionReceipt>;
+  dissociateTokenFromAccount: (
+    accountId: string,
+    tokenId: string
+  ) => Promise<TransactionReceipt>;
+  updateAccount: (
+    accountId: string,
+    maxAutomaticTokenAssociations: number
+  ) => Promise<TransactionReceipt>;
+  approveAllowance: (
+    spenderAccountId: string,
+    tokenId: string,
+    amount: number,
+    ownerAccountId: string
+  ) => Promise<TransactionReceipt>;
+  getAccountTokens: (accountId: string) => Promise<{ tokens: TokenBalance[] }>;
   HashgraphSDK: typeof hashgraph;
 };
 

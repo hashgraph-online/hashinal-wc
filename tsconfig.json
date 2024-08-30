@@ -3,6 +3,7 @@
     "outDir": "./dist/",
     "rootDir": "./src/",
     "noImplicitAny": true,
+    "strict": false,
     "module": "es6",
     "target": "es5",
     "jsx": "react",
@@ -12,7 +13,8 @@
     "lib": ["es2015", "dom"],
     "types": ["./src/types.d.ts"],
     "declaration": true,
-    "emitDeclarationOnly": true
+    "emitDeclarationOnly": true,
+    "skipLibCheck": true
   },
-  "include": ["src/**/*"]
+  "include": ["./src/index.ts"]
 }
