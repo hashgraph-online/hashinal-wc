@@ -40,7 +40,7 @@ The script located in the dist folder can be used directly, but it's primarily i
 To use this script, ensure that you reference the current version's Topic ID in your HTML.
 
 ```html
-<script data-src="hcs://1/0.0.6843009" data-script-id="wallet-connect"></script>
+<script data-src="hcs://1/0.0.7001143" data-script-id="wallet-connect"></script>
 ```
 
 Later in your code, access the SDK.
@@ -241,6 +241,7 @@ Version 1.0.4 and onward correlate with the NPM Package version.
 | ------- | ----------- | ----------- |
 | v0.0.1  | 0.0.6790163 | UMD |
 | v1.0.4  | 0.0.6843009 | UMD |
+| v1.0.58 | 0.0.7001143 | UMD |
 
 ## Contributing
 
