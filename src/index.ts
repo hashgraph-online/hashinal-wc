@@ -123,7 +123,7 @@ class HashinalsWalletConnectSDK {
     disableSigner: boolean = false
   ): Promise<TransactionReceipt> {
     this.ensureInitialized();
-    const accountId = await this.getAccountInfo();
+    const accountId = this.getAccountInfo();
     const signer = this.dAppConnector.signers.find(
       (signer_) => signer_.getAccountId().toString() === accountId
     );
@@ -525,6 +525,7 @@ class HashinalsWalletConnectSDK {
     if (typeof window !== 'undefined') {
       (window as any).HashinalsWalletConnectSDK =
         HashinalsWalletConnectSDK.getInstance();
+      (window as any).HashgraphSDK = HashgraphSDK;
     }
   }
 
