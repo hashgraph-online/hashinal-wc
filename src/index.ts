@@ -48,7 +48,7 @@ class HashinalsWalletConnectSDK {
     this.network = network || LedgerId.MAINNET;
   }
 
-  static getInstance(
+  public static getInstance(
     logger?: ILogger,
     network?: LedgerId
   ): HashinalsWalletConnectSDK {
@@ -66,19 +66,19 @@ class HashinalsWalletConnectSDK {
     return instance;
   }
 
-  setLogger(logger: ILogger): void {
+  public setLogger(logger: ILogger): void {
     this.logger = logger;
   }
 
-  setNetwork(network: LedgerId): void {
+  public setNetwork(network: LedgerId): void {
     this.network = network;
   }
 
-  getNetwork(): LedgerId {
+  public getNetwork(): LedgerId {
     return this.network;
   }
 
-  setLogLevel(level: 'error' | 'warn' | 'info' | 'debug'): void {
+  public setLogLevel(level: 'error' | 'warn' | 'info' | 'debug'): void {
     if (this.logger instanceof DefaultLogger) {
       this.logger.setLogLevel(level);
     } else {
@@ -86,7 +86,7 @@ class HashinalsWalletConnectSDK {
     }
   }
 
-  async init(
+  public async init(
     projectId: string,
     metadata: SignClientTypes.Metadata,
     network?: LedgerId
@@ -113,14 +113,14 @@ class HashinalsWalletConnectSDK {
     return this.dAppConnector;
   }
 
-  async connect(): Promise<SessionTypes.Struct> {
+  public async connect(): Promise<SessionTypes.Struct> {
     this.ensureInitialized();
     const session = await this.dAppConnector.openModal();
     this.handleNewSession(session);
     return session;
   }
 
-  async disconnect(): Promise<boolean> {
+  public async disconnect(): Promise<boolean> {
     try {
       this.ensureInitialized();
       await this.dAppConnector!.disconnectAll();
@@ -213,7 +213,7 @@ class HashinalsWalletConnectSDK {
     }
   }
 
-  async submitMessageToTopic(
+  public async submitMessageToTopic(
     topicId: string,
     message: string,
     submitKey?: PrivateKey
@@ -231,7 +231,7 @@ class HashinalsWalletConnectSDK {
     return this.executeTransaction(transaction);
   }
 
-  async transferHbar(
+  public async transferHbar(
     fromAccountId: string,
     toAccountId: string,
     amount: number
@@ -340,7 +340,7 @@ class HashinalsWalletConnectSDK {
     return Number(balance).toLocaleString('en-US');
   }
 
-  getAccountInfo(): {
+  public getAccountInfo(): {
     accountId: string;
     network: LedgerId;
   } {
@@ -365,7 +365,7 @@ class HashinalsWalletConnectSDK {
     };
   }
 
-  async createTopic(
+  public async createTopic(
     memo?: string,
     adminKey?: string,
     submitKey?: string
@@ -388,7 +388,7 @@ class HashinalsWalletConnectSDK {
     return receipt.topicId!.toString();
   }
 
-  async createToken(
+  public async createToken(
     name: string,
     symbol: string,
     initialSupply: number,
@@ -421,7 +421,7 @@ class HashinalsWalletConnectSDK {
     return receipt.tokenId!.toString();
   }
 
-  async mintNFT(
+  public async mintNFT(
     tokenId: string,
     metadata: string,
     supplyKey: PrivateKey
@@ -436,7 +436,7 @@ class HashinalsWalletConnectSDK {
     return this.executeTransaction(transaction);
   }
 
-  async getMessages(
+  public async getMessages(
     topicId: string,
     lastTimestamp?: number,
     disableTimestampFilter: boolean = false
@@ -498,7 +498,7 @@ class HashinalsWalletConnectSDK {
     }
   }
 
-  saveConnectionInfo(
+  private saveConnectionInfo(
     accountId: string | undefined,
     connectedNetwork?: string | undefined
   ): void {
@@ -511,14 +511,17 @@ class HashinalsWalletConnectSDK {
     }
   }
 
-  loadConnectionInfo(): { accountId: string | null; network: string | null } {
+  public loadConnectionInfo(): {
+    accountId: string | null;
+    network: string | null;
+  } {
     return {
       accountId: localStorage.getItem('connectedAccountId'),
       network: localStorage.getItem('connectedNetwork'),
     };
   }
 
-  async connectWallet(
+  public async connectWallet(
     PROJECT_ID: string,
     APP_METADATA: SignClientTypes.Metadata,
     network?: LedgerId
@@ -548,7 +551,9 @@ class HashinalsWalletConnectSDK {
     }
   }
 
-  async disconnectWallet(clearStorage: boolean = true): Promise<boolean> {
+  public async disconnectWallet(
+    clearStorage: boolean = true
+  ): Promise<boolean> {
     try {
       const success = await this.disconnect();
 
@@ -564,7 +569,7 @@ class HashinalsWalletConnectSDK {
     }
   }
 
-  async initAccount(
+  public async initAccount(
     PROJECT_ID: string,
     APP_METADATA: SignClientTypes.Metadata
   ): Promise<{ accountId: string; balance: string } | null> {
@@ -604,7 +609,7 @@ class HashinalsWalletConnectSDK {
     }
   }
 
-  async transferToken(
+  public async transferToken(
     tokenId: string,
     fromAccountId: string,
     toAccountId: string,
@@ -638,7 +643,7 @@ class HashinalsWalletConnectSDK {
     return this.executeTransaction(transaction);
   }
 
-  async associateTokenToAccount(
+  public async associateTokenToAccount(
     accountId: string,
     tokenId: string
   ): Promise<TransactionReceipt> {
@@ -651,7 +656,7 @@ class HashinalsWalletConnectSDK {
     return this.executeTransaction(transaction);
   }
 
-  async dissociateTokenFromAccount(
+  public async dissociateTokenFromAccount(
     accountId: string,
     tokenId: string
   ): Promise<TransactionReceipt> {
@@ -664,7 +669,7 @@ class HashinalsWalletConnectSDK {
     return this.executeTransaction(transaction);
   }
 
-  async updateAccount(
+  public async updateAccount(
     accountId: string,
     maxAutomaticTokenAssociations: number
   ): Promise<TransactionReceipt> {
@@ -677,7 +682,7 @@ class HashinalsWalletConnectSDK {
     return this.executeTransaction(transaction);
   }
 
-  async approveAllowance(
+  public async approveAllowance(
     spenderAccountId: string,
     tokenId: string,
     amount: number,
@@ -696,7 +701,7 @@ class HashinalsWalletConnectSDK {
     return this.executeTransaction(transaction);
   }
 
-  async getAccountTokens(
+  public async getAccountTokens(
     accountId: string
   ): Promise<{ tokens: TokenBalance[] }> {
     this.ensureInitialized();
