@@ -74,6 +74,10 @@ class HashinalsWalletConnectSDK {
     this.network = network;
   }
 
+  getNetwork(): LedgerId {
+    return this.network;
+  }
+
   setLogLevel(level: 'error' | 'warn' | 'info' | 'debug'): void {
     if (this.logger instanceof DefaultLogger) {
       this.logger.setLogLevel(level);
@@ -133,7 +137,8 @@ class HashinalsWalletConnectSDK {
     disableSigner: boolean = false
   ): Promise<TransactionReceipt> {
     this.ensureInitialized();
-    const accountId = this.getAccountInfo();
+    const accountInfo = this.getAccountInfo();
+    const accountId = accountInfo?.accountId;
     const signer = this.dAppConnector.signers.find(
       (signer_) => signer_.getAccountId().toString() === accountId
     );
@@ -259,19 +264,23 @@ class HashinalsWalletConnectSDK {
 
   private handleNewSession(session: SessionTypes.Struct) {
     const sessionAccount = session.namespaces?.hedera?.accounts?.[0];
-    const accountId = sessionAccount?.split(':').pop();
+    const sessionParts = sessionAccount?.split(':');
+    const accountId = sessionParts.pop();
+    const network = sessionParts.pop();
+    this.logger.info('sessionAccount is', accountId, network);
     if (!accountId) {
       this.logger.error('No account id found in the session');
       return;
     } else {
-      this.saveConnectionInfo(accountId);
+      this.saveConnectionInfo(accountId, network);
     }
   }
 
   private getNetworkPrefix(): string {
-    let currentNetwork = this.network;
+    const accountInfo = this.getAccountInfo();
+    const network = accountInfo?.network;
 
-    if (!currentNetwork) {
+    if (!network) {
       this.logger.warn('Network is not set on SDK, defaulting.');
 
       const cachedNetwork = localStorage.getItem('connectedNetwork');
@@ -283,7 +292,15 @@ class HashinalsWalletConnectSDK {
       return 'mainnet-public';
     }
 
-    return currentNetwork.isMainnet() ? 'mainnet-public' : 'testnet';
+    if (network !== this.network) {
+      this.logger.warn(
+        'Detected network mismatch, reverting to signer network',
+        network
+      );
+      this.network = network;
+    }
+
+    return network.isMainnet() ? 'mainnet-public' : 'testnet';
   }
 
   private async requestAccount(account: string): Promise<any> {
@@ -306,7 +323,8 @@ class HashinalsWalletConnectSDK {
 
   async getAccountBalance(): Promise<string> {
     this.ensureInitialized();
-    const account = this.getAccountInfo();
+    const accountInfo = this.getAccountInfo();
+    const account = accountInfo?.accountId;
 
     if (!account) {
       return null;
@@ -322,12 +340,14 @@ class HashinalsWalletConnectSDK {
     return Number(balance).toLocaleString('en-US');
   }
 
-  getAccountInfo(): string {
+  getAccountInfo(): {
+    accountId: string;
+    network: LedgerId;
+  } {
     const { accountId: cachedAccountId } = this.loadConnectionInfo();
     if (!cachedAccountId) {
       return null;
     }
-    this.logger.info(`Getting signer for ${cachedAccountId}`);
     const signers = this?.dAppConnector?.signers;
 
     if (!signers?.length) {
@@ -337,7 +357,12 @@ class HashinalsWalletConnectSDK {
     const cachedSigner = this.dAppConnector.signers.find(
       (signer_) => signer_.getAccountId().toString() === cachedAccountId
     );
-    return cachedSigner?.getAccountId()?.toString();
+    const accountId = cachedSigner?.getAccountId()?.toString();
+    const network = cachedSigner.getLedgerId();
+    return {
+      accountId,
+      network,
+    };
   }
 
   async createTopic(
@@ -506,7 +531,8 @@ class HashinalsWalletConnectSDK {
       await this.init(PROJECT_ID, APP_METADATA, network);
       const session = await this.connect();
 
-      const accountId = this.getAccountInfo();
+      const accountInfo = this.getAccountInfo();
+      const accountId = accountInfo?.accountId;
       const balance = await this.getAccountBalance();
       const networkPrefix = this.getNetworkPrefix();
 

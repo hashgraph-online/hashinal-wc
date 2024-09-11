@@ -13,6 +13,7 @@ declare class HashinalsWalletConnectSDK {
     static getInstance(logger?: ILogger, network?: LedgerId): HashinalsWalletConnectSDK;
     setLogger(logger: ILogger): void;
     setNetwork(network: LedgerId): void;
+    getNetwork(): LedgerId;
     setLogLevel(level: 'error' | 'warn' | 'info' | 'debug'): void;
     init(projectId: string, metadata: SignClientTypes.Metadata, network?: LedgerId): Promise<DAppConnector>;
     connect(): Promise<SessionTypes.Struct>;
@@ -29,7 +30,10 @@ declare class HashinalsWalletConnectSDK {
     private getNetworkPrefix;
     private requestAccount;
     getAccountBalance(): Promise<string>;
-    getAccountInfo(): string;
+    getAccountInfo(): {
+        accountId: string;
+        network: LedgerId;
+    };
     createTopic(memo?: string, adminKey?: string, submitKey?: string): Promise<string>;
     createToken(name: string, symbol: string, initialSupply: number, decimals: number, treasuryAccountId: string, adminKey: string, supplyKey: string): Promise<string>;
     mintNFT(tokenId: string, metadata: string, supplyKey: PrivateKey): Promise<TransactionReceipt>;
