@@ -1,4 +1,4 @@
-import { c, H } from "./index-Buxj04Dp.js";
+import { c, H } from "./index-DiIaDL3J.js";
 export {
   c as HashgraphSDK,
   H as HashinalsWalletConnectSDK

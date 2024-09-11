@@ -12,6 +12,7 @@ declare class HashinalsWalletConnectSDK {
     constructor(logger?: ILogger, network?: LedgerId);
     static getInstance(logger?: ILogger, network?: LedgerId): HashinalsWalletConnectSDK;
     setLogger(logger: ILogger): void;
+    setNetwork(network: LedgerId): void;
     setLogLevel(level: 'error' | 'warn' | 'info' | 'debug'): void;
     init(projectId: string, metadata: SignClientTypes.Metadata, network?: LedgerId): Promise<DAppConnector>;
     connect(): Promise<SessionTypes.Struct>;
@@ -25,6 +26,7 @@ declare class HashinalsWalletConnectSDK {
     transferHbar(fromAccountId: string, toAccountId: string, amount: number): Promise<TransactionReceipt>;
     executeSmartContract(contractId: string, functionName: string, parameters: ContractFunctionParameters, gas?: number): Promise<TransactionReceipt>;
     private handleNewSession;
+    private getNetworkPrefix;
     private requestAccount;
     getAccountBalance(): Promise<string>;
     getAccountInfo(): string;
@@ -32,8 +34,11 @@ declare class HashinalsWalletConnectSDK {
     createToken(name: string, symbol: string, initialSupply: number, decimals: number, treasuryAccountId: string, adminKey: string, supplyKey: string): Promise<string>;
     mintNFT(tokenId: string, metadata: string, supplyKey: PrivateKey): Promise<TransactionReceipt>;
     getMessages(topicId: string, lastTimestamp?: number, disableTimestampFilter?: boolean): Promise<FetchMessagesResult>;
-    saveConnectionInfo(accountId: string | undefined): void;
-    loadConnectionInfo(): string | null;
+    saveConnectionInfo(accountId: string | undefined, connectedNetwork?: string | undefined): void;
+    loadConnectionInfo(): {
+        accountId: string | null;
+        network: string | null;
+    };
     connectWallet(PROJECT_ID: string, APP_METADATA: SignClientTypes.Metadata, network?: LedgerId): Promise<{
         accountId: string;
         balance: string;

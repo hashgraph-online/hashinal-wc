@@ -35,6 +35,7 @@ import {
 } from '@hashgraph/hedera-wallet-connect';
 import { Message, FetchMessagesResult, TokenBalance } from './types';
 import { DefaultLogger, ILogger } from './logger/logger';
+import { fetchWithRetry } from './utils/retry';
 
 class HashinalsWalletConnectSDK {
   private static instance: HashinalsWalletConnectSDK;
@@ -51,17 +52,26 @@ class HashinalsWalletConnectSDK {
     logger?: ILogger,
     network?: LedgerId
   ): HashinalsWalletConnectSDK {
-    if (!HashinalsWalletConnectSDK.instance) {
+    let instance = HashinalsWalletConnectSDK?.instance;
+    if (!instance) {
       HashinalsWalletConnectSDK.instance = new HashinalsWalletConnectSDK(
         logger,
         network
       );
+      instance = HashinalsWalletConnectSDK.instance;
     }
-    return HashinalsWalletConnectSDK.instance;
+    if (network) {
+      instance.setNetwork(network);
+    }
+    return instance;
   }
 
   setLogger(logger: ILogger): void {
     this.logger = logger;
+  }
+
+  setNetwork(network: LedgerId): void {
+    this.network = network;
   }
 
   setLogLevel(level: 'error' | 'warn' | 'info' | 'debug'): void {
@@ -251,21 +261,41 @@ class HashinalsWalletConnectSDK {
     const sessionAccount = session.namespaces?.hedera?.accounts?.[0];
     const accountId = sessionAccount?.split(':').pop();
     if (!accountId) {
-      console.error('No account id found in the session');
+      this.logger.error('No account id found in the session');
       return;
     } else {
       this.saveConnectionInfo(accountId);
     }
   }
 
+  private getNetworkPrefix(): string {
+    let currentNetwork = this.network;
+
+    if (!currentNetwork) {
+      this.logger.warn('Network is not set on SDK, defaulting.');
+
+      const cachedNetwork = localStorage.getItem('connectedNetwork');
+
+      if (cachedNetwork) {
+        return cachedNetwork;
+      }
+
+      return 'mainnet-public';
+    }
+
+    return currentNetwork.isMainnet() ? 'mainnet-public' : 'testnet';
+  }
+
   private async requestAccount(account: string): Promise<any> {
     try {
-      const url = `https://${
-        this.network === LedgerId.MAINNET ? 'mainnet-public' : 'testnet'
-      }.mirrornode.hedera.com/api/v1/accounts/${account}`;
-      const response = await fetch(url);
+      const networkPrefix = this.getNetworkPrefix();
+
+      const url = `https://${networkPrefix}.mirrornode.hedera.com/api/v1/accounts/${account}`;
+      const response = await fetchWithRetry(url);
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(
+          `Failed to make request to mirror node for account: ${response.status}`
+        );
       }
       return await response.json();
     } catch (e) {
@@ -293,11 +323,17 @@ class HashinalsWalletConnectSDK {
   }
 
   getAccountInfo(): string {
-    const cachedAccountId = this.loadConnectionInfo();
+    const { accountId: cachedAccountId } = this.loadConnectionInfo();
     if (!cachedAccountId) {
       return null;
     }
     this.logger.info(`Getting signer for ${cachedAccountId}`);
+    const signers = this?.dAppConnector?.signers;
+
+    if (!signers?.length) {
+      return null;
+    }
+
     const cachedSigner = this.dAppConnector.signers.find(
       (signer_) => signer_.getAccountId().toString() === cachedAccountId
     );
@@ -380,9 +416,8 @@ class HashinalsWalletConnectSDK {
     lastTimestamp?: number,
     disableTimestampFilter: boolean = false
   ): Promise<FetchMessagesResult> {
-    const baseUrl = `https://${
-      this.network === LedgerId.MAINNET ? 'mainnet-public' : 'testnet'
-    }.mirrornode.hedera.com`;
+    const networkPrefix = this.getNetworkPrefix();
+    const baseUrl = `https://${networkPrefix}.mirrornode.hedera.com`;
     const timestampQuery =
       Number(lastTimestamp) > 0 && !disableTimestampFilter
         ? `&timestamp=gt:${lastTimestamp}`
@@ -391,9 +426,11 @@ class HashinalsWalletConnectSDK {
     const url = `${baseUrl}/api/v1/topics/${topicId}/messages?limit=200${timestampQuery}`;
 
     try {
-      const response = await fetch(url);
+      const response = await fetchWithRetry(url);
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(
+          `Failed to make request to mirror node: ${response.status}`
+        );
       }
       const data = await response.json();
       const messages = data?.messages || [];
@@ -436,16 +473,24 @@ class HashinalsWalletConnectSDK {
     }
   }
 
-  saveConnectionInfo(accountId: string | undefined): void {
+  saveConnectionInfo(
+    accountId: string | undefined,
+    connectedNetwork?: string | undefined
+  ): void {
     if (!accountId) {
       localStorage.removeItem('connectedAccountId');
+      localStorage.removeItem('connectedNetwork');
     } else {
+      localStorage.setItem('connectedNetwork', connectedNetwork);
       localStorage.setItem('connectedAccountId', accountId);
     }
   }
 
-  loadConnectionInfo(): string | null {
-    return localStorage.getItem('connectedAccountId');
+  loadConnectionInfo(): { accountId: string | null; network: string | null } {
+    return {
+      accountId: localStorage.getItem('connectedAccountId'),
+      network: localStorage.getItem('connectedNetwork'),
+    };
   }
 
   async connectWallet(
@@ -461,10 +506,11 @@ class HashinalsWalletConnectSDK {
       await this.init(PROJECT_ID, APP_METADATA, network);
       const session = await this.connect();
 
-      const accountId = await this.getAccountInfo();
+      const accountId = this.getAccountInfo();
       const balance = await this.getAccountBalance();
+      const networkPrefix = this.getNetworkPrefix();
 
-      this.saveConnectionInfo(accountId);
+      this.saveConnectionInfo(accountId, networkPrefix);
       return {
         accountId,
         balance,
@@ -496,11 +542,14 @@ class HashinalsWalletConnectSDK {
     PROJECT_ID: string,
     APP_METADATA: SignClientTypes.Metadata
   ): Promise<{ accountId: string; balance: string } | null> {
-    const savedAccountId = this.loadConnectionInfo();
+    const { accountId: savedAccountId, network: savedNetwork } =
+      this.loadConnectionInfo();
 
-    if (savedAccountId) {
+    if (savedAccountId && savedNetwork) {
       try {
-        await this.init(PROJECT_ID, APP_METADATA);
+        const network =
+          savedNetwork === 'mainnet' ? LedgerId.MAINNET : LedgerId.TESTNET;
+        await this.init(PROJECT_ID, APP_METADATA, network);
         const balance = await this.getAccountBalance();
         return {
           accountId: savedAccountId,
@@ -508,7 +557,7 @@ class HashinalsWalletConnectSDK {
         };
       } catch (error) {
         this.logger.error('Failed to reconnect:', error);
-        localStorage.removeItem('connectedAccountId');
+        this.saveConnectionInfo(undefined, undefined);
         return null;
       }
     }
@@ -626,15 +675,16 @@ class HashinalsWalletConnectSDK {
   ): Promise<{ tokens: TokenBalance[] }> {
     this.ensureInitialized();
 
-    const baseUrl = `https://${
-      this.network === LedgerId.MAINNET ? 'mainnet-public' : 'testnet'
-    }.mirrornode.hedera.com`;
+    const networkPrefix = this.getNetworkPrefix();
+    const baseUrl = `https://${networkPrefix}.mirrornode.hedera.com`;
     const url = `${baseUrl}/api/v1/accounts/${accountId}/tokens?limit=200`;
 
     try {
-      const response = await fetch(url);
+      const response = await fetchWithRetry(url);
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(
+          `Failed to make request to mirror node for account tokens: ${response.status}`
+        );
       }
       const data = await response.json();
 
@@ -657,9 +707,11 @@ class HashinalsWalletConnectSDK {
       let nextLink = data.links?.next;
       while (nextLink) {
         const nextUrl = `${baseUrl}${nextLink}`;
-        const nextResponse = await fetch(nextUrl);
+        const nextResponse = await fetchWithRetry(nextUrl);
         if (!nextResponse.ok) {
-          throw new Error(`HTTP error! status: ${nextResponse.status}`);
+          throw new Error(
+            `Failed to make request to mirror node for account tokens: ${nextResponse.status}, page: ${nextUrl}`
+          );
         }
         const nextData = await nextResponse.json();
 
