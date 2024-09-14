@@ -602,10 +602,14 @@ class HashinalsWalletConnectSDK {
   }
 
   static run(): void {
-    if (typeof window !== 'undefined') {
-      (window as any).HashinalsWalletConnectSDK =
-        HashinalsWalletConnectSDK.getInstance();
-      (window as any).HashgraphSDK = HashgraphSDK;
+    try {
+      if (typeof window !== 'undefined') {
+        (window as any).HashinalsWalletConnectSDK =
+          HashinalsWalletConnectSDK.getInstance();
+        (window as any).HashgraphSDK = HashgraphSDK;
+      }
+    } catch (e) {
+      console.error('[ERROR]: failed setting sdk on window');
     }
   }
 
