@@ -308,7 +308,7 @@ class HashinalsWalletConnectSDK {
       const networkPrefix = this.getNetworkPrefix();
 
       const url = `https://${networkPrefix}.mirrornode.hedera.com/api/v1/accounts/${account}`;
-      const response = await fetchWithRetry(url);
+      const response = await fetchWithRetry()(url);
       if (!response.ok) {
         throw new Error(
           `Failed to make request to mirror node for account: ${response.status}`
@@ -451,7 +451,7 @@ class HashinalsWalletConnectSDK {
     const url = `${baseUrl}/api/v1/topics/${topicId}/messages?limit=200${timestampQuery}`;
 
     try {
-      const response = await fetchWithRetry(url);
+      const response = await fetchWithRetry()(url);
       if (!response.ok) {
         throw new Error(
           `Failed to make request to mirror node: ${response.status}`
@@ -715,7 +715,7 @@ class HashinalsWalletConnectSDK {
     const url = `${baseUrl}/api/v1/accounts/${accountId}/tokens?limit=200`;
 
     try {
-      const response = await fetchWithRetry(url);
+      const response = await fetchWithRetry()(url);
       if (!response.ok) {
         throw new Error(
           `Failed to make request to mirror node for account tokens: ${response.status}`
@@ -742,7 +742,7 @@ class HashinalsWalletConnectSDK {
       let nextLink = data.links?.next;
       while (nextLink) {
         const nextUrl = `${baseUrl}${nextLink}`;
-        const nextResponse = await fetchWithRetry(nextUrl);
+        const nextResponse = await fetchWithRetry()(nextUrl);
         if (!nextResponse.ok) {
           throw new Error(
             `Failed to make request to mirror node for account tokens: ${nextResponse.status}, page: ${nextUrl}`
@@ -780,8 +780,7 @@ class HashinalsWalletConnectSDK {
 
 // This variable is replaced at build time.
 // @ts-ignore
-const isUMD = 'VITE_BUILD_FORMAT' === 'umd';
-if (isUMD) {
+if ('VITE_BUILD_FORMAT' === 'umd') {
   HashinalsWalletConnectSDK.run();
 }
 

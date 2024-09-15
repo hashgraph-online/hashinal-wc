@@ -7,13 +7,25 @@ export default defineConfig(({ mode }) => {
   const format = process.env.BUILD_FORMAT || 'es';
   const outputDir = format === 'umd' ? 'dist/umd' : 'dist/es';
 
+  // ESM does not bundle these to add flexibility e.g. for NextJS Apps.
+  const externalDependencies = [
+    '@hashgraph/hedera-wallet-connect',
+    '@hashgraph/proto',
+    '@hashgraph/sdk',
+    '@walletconnect/modal',
+    '@walletconnect/modal-core',
+    '@walletconnect/qrcode-modal',
+    '@walletconnect/utils',
+    'fetch-retry',
+  ];
+
   return {
     plugins: [
       nodePolyfills(),
       StringReplace([
         {
-          search: 'VITE_BUILD_FORMAT', // search this string in content
-          replace: format, // replace search string with this
+          search: 'VITE_BUILD_FORMAT',
+          replace: format,
         },
       ]),
     ],
@@ -26,7 +38,7 @@ export default defineConfig(({ mode }) => {
         formats: [format],
       },
       rollupOptions: {
-        external: [],
+        external: format === 'es' ? externalDependencies : [],
         output: {
           globals: (id) => id,
         },
@@ -47,6 +59,9 @@ export default defineConfig(({ mode }) => {
         zlib: 'browserify-zlib',
         util: 'util',
       },
+    },
+    ssr: {
+      external: externalDependencies,
     },
   };
 });

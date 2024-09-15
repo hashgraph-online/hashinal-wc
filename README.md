@@ -34,7 +34,7 @@ No installation needed. Reference the script directly in your HTML:
 Install the package:
 
 ```bash
-npm install @hashgraphonline/hashinals-wc
+npm install @hashgraphonline/hashinals-wc @hashgraph/sdk @hashgraph/proto @hashgraph/hedera-wallet-connect @walletconnect/modal @walletconnect/qrcode-modal @walletconnect/utils @walletconnect/types @walletconnect/modal-core fetch-retry
 ```
 
 ## Usage
