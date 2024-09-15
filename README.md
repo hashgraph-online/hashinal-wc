@@ -26,7 +26,7 @@ This SDK provides a simple interface for interacting with the Hedera Hashgraph u
 No installation needed. Reference the script directly in your HTML:
 
 ```html
-<script data-src="hcs://1/0.0.7111719" data-script-id="wallet-connect"></script>
+<script data-src="hcs://1/0.0.7153927" data-script-id="wallet-connect"></script>
 ```
 
 ### For NPM projects (ESM)
@@ -528,6 +528,7 @@ Version 1.0.58 and onward correlate with the NPM Package version.
 | v1.0.4  | 0.0.6843009 | UMD  |
 | v1.0.58 | 0.0.7001143 | UMD  |
 | v1.0.62 | 0.0.7111719 | UMD  |
+| v1.0.64 | 0.0.7153927 | UMD  |
 
 ## Contributing
 
