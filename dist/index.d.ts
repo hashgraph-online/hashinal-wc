@@ -65,4 +65,5 @@ declare class HashinalsWalletConnectSDK {
         tokens: TokenBalance[];
     }>;
 }
+export * from './types';
 export { HashinalsWalletConnectSDK, HashgraphSDK };

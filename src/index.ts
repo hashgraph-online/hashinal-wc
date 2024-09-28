@@ -789,4 +789,5 @@ if ('VITE_BUILD_FORMAT' === 'umd') {
   HashinalsWalletConnectSDK.run();
 }
 
+export * from './types';
 export { HashinalsWalletConnectSDK, HashgraphSDK };

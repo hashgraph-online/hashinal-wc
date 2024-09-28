@@ -7,7 +7,11 @@ import {
 } from '@hashgraph/sdk';
 import * as HashgraphSDK from '@hashgraph/sdk';
 import { DAppConnector } from '@hashgraph/hedera-wallet-connect';
-import { FetchMessagesResult, HederaAccountResponse, TokenBalance } from './types';
+import type {
+  FetchMessagesResult,
+  HederaAccountResponse,
+  TokenBalance,
+} from './types';
 import { ILogger } from './logger/logger';
 
 declare class HashinalsWalletConnectSDK {
@@ -123,4 +127,13 @@ declare class HashinalsWalletConnectSDK {
     tokens: TokenBalance[];
   }>;
 }
+
+declare global {
+  interface Window {
+    HashinalsWalletConnectSDK: HashinalsWalletConnectSDK;
+  }
+}
+
+declare const __UMD__: boolean;
+
 export { HashinalsWalletConnectSDK, HashgraphSDK };

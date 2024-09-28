@@ -1799,6 +1799,15 @@ class DefaultLogger {
 const fetchWithRetry = () => retryFetch(fetch, {
   retries: 3
 });
+var Name = /* @__PURE__ */ ((Name2) => {
+  Name2["Contractcall"] = "CONTRACTCALL";
+  Name2["Cryptotransfer"] = "CRYPTOTRANSFER";
+  return Name2;
+})(Name || {});
+var Result = /* @__PURE__ */ ((Result2) => {
+  Result2["Success"] = "SUCCESS";
+  return Result2;
+})(Result || {});
 class HashinalsWalletConnectSDK {
   constructor(logger, network) {
     this.logger = logger || new DefaultLogger();
@@ -2315,6 +2324,8 @@ class HashinalsWalletConnectSDK {
 }
 export {
   HashgraphSDK,
-  HashinalsWalletConnectSDK
+  HashinalsWalletConnectSDK,
+  Name,
+  Result
 };
 //# sourceMappingURL=hashinal-wc.es.js.map
