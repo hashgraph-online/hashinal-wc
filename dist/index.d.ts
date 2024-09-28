@@ -2,7 +2,7 @@ import { SessionTypes, SignClientTypes } from '@walletconnect/types';
 import { Transaction, LedgerId, TransactionReceipt, ContractFunctionParameters, PrivateKey } from '@hashgraph/sdk';
 import * as HashgraphSDK from '@hashgraph/sdk';
 import { DAppConnector } from '@hashgraph/hedera-wallet-connect';
-import { FetchMessagesResult, TokenBalance } from './types';
+import { FetchMessagesResult, TokenBalance, HederaAccountResponse } from './types';
 import { ILogger } from './logger/logger';
 declare class HashinalsWalletConnectSDK {
     private static instance;
@@ -28,7 +28,7 @@ declare class HashinalsWalletConnectSDK {
     executeSmartContract(contractId: string, functionName: string, parameters: ContractFunctionParameters, gas?: number): Promise<TransactionReceipt>;
     private handleNewSession;
     private getNetworkPrefix;
-    private requestAccount;
+    requestAccount(account: string): Promise<HederaAccountResponse>;
     getAccountBalance(): Promise<string>;
     getAccountInfo(): {
         accountId: string;

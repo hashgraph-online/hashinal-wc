@@ -3,6 +3,101 @@ import hashgraph, { PrivateKey, Transaction } from '@hashgraph/sdk';
 import { ContractFunctionParameters, TransactionReceipt } from '@hashgraph/sdk';
 import { SessionTypes, SignClientTypes } from '@walletconnect/types';
 
+export interface HederaAccountResponse {
+  account: string;
+  alias: null;
+  auto_renew_period: number;
+  balance: Balance;
+  created_timestamp: string;
+  decline_reward: boolean;
+  deleted: boolean;
+  ethereum_nonce: number;
+  evm_address: string;
+  expiry_timestamp: string;
+  key: Key;
+  max_automatic_token_associations: number;
+  memo: string;
+  pending_reward: number;
+  receiver_sig_required: boolean;
+  staked_account_id: null;
+  staked_node_id: number;
+  stake_period_start: string;
+  transactions: Transaction[];
+  links: Links;
+}
+
+export interface Balance {
+  balance: number;
+  timestamp: string;
+  tokens: Token[];
+}
+
+export interface Token {
+  token_id: string;
+  balance: number;
+}
+
+export interface Key {
+  _type: string;
+  key: string;
+}
+
+export interface Links {
+  next: string;
+}
+
+export interface Transaction {
+  bytes: null;
+  charged_tx_fee: number;
+  consensus_timestamp: string;
+  entity_id: null | string;
+  max_fee: string;
+  memo_base64: string;
+  name: Name;
+  nft_transfers: NftTransfer[];
+  node: string;
+  nonce: number;
+  parent_consensus_timestamp: null;
+  result: Result;
+  scheduled: boolean;
+  staking_reward_transfers: StakingRewardTransfer[];
+  token_transfers: Transfer[];
+  transaction_hash: string;
+  transaction_id: string;
+  transfers: Transfer[];
+  valid_duration_seconds: string;
+  valid_start_timestamp: string;
+}
+
+export enum Name {
+  Contractcall = 'CONTRACTCALL',
+  Cryptotransfer = 'CRYPTOTRANSFER',
+}
+
+export interface NftTransfer {
+  is_approval: boolean;
+  receiver_account_id: string;
+  sender_account_id: string;
+  serial_number: number;
+  token_id: string;
+}
+
+export enum Result {
+  Success = 'SUCCESS',
+}
+
+export interface StakingRewardTransfer {
+  account: string;
+  amount: number;
+}
+
+export interface Transfer {
+  token_id?: string;
+  account: string;
+  amount: number;
+  is_approval: boolean;
+}
+
 export interface Message {
   payer: string;
   created: Date;

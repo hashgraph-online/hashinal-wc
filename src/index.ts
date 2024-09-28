@@ -33,7 +33,12 @@ import {
   DAppConnector,
   HederaChainId,
 } from '@hashgraph/hedera-wallet-connect';
-import { Message, FetchMessagesResult, TokenBalance } from './types';
+import {
+  Message,
+  FetchMessagesResult,
+  TokenBalance,
+  HederaAccountResponse,
+} from './types';
 import { DefaultLogger, ILogger } from './logger/logger';
 import { fetchWithRetry } from './utils/retry';
 
@@ -303,7 +308,7 @@ class HashinalsWalletConnectSDK {
     return network.isMainnet() ? 'mainnet-public' : 'testnet';
   }
 
-  private async requestAccount(account: string): Promise<any> {
+  public async requestAccount(account: string): Promise<HederaAccountResponse> {
     try {
       const networkPrefix = this.getNetworkPrefix();
 
@@ -321,7 +326,7 @@ class HashinalsWalletConnectSDK {
     }
   }
 
-  async getAccountBalance(): Promise<string> {
+  public async getAccountBalance(): Promise<string> {
     this.ensureInitialized();
     const accountInfo = this.getAccountInfo();
     const account = accountInfo?.accountId;
