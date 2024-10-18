@@ -1,6 +1,7 @@
 import { DAppConnector } from '@hashgraph/hedera-wallet-connect';
-import { default as hashgraph, PrivateKey, Transaction, ContractFunctionParameters, TransactionReceipt } from '@hashgraph/sdk';
+import { ContractFunctionParameters, TransactionReceipt, PrivateKey, Transaction } from '@hashgraph/sdk';
 import { SessionTypes, SignClientTypes } from '@walletconnect/types';
+import * as hashgraph from '@hashgraph/sdk';
 export interface HederaAccountResponse {
     account: string;
     alias: null;

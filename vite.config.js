@@ -14,6 +14,7 @@ export default defineConfig(({ mode }) => {
     '@hashgraph/proto',
     '@hashgraph/sdk',
     '@walletconnect/modal',
+    '@walletconnect/core',
     '@walletconnect/modal-core',
     '@walletconnect/qrcode-modal',
     '@walletconnect/utils',
