@@ -34,7 +34,7 @@ No installation needed. Reference the script directly in your HTML:
 Install the package:
 
 ```bash
-npm install @hashgraphonline/hashinals-wc @hashgraph/sdk @hashgraph/proto @hashgraph/hedera-wallet-connect @walletconnect/modal @walletconnect/qrcode-modal @walletconnect/utils @walletconnect/types @walletconnect/modal-core fetch-retry
+npm install @hashgraphonline/hashinal-wc @hashgraph/sdk @hashgraph/proto @hashgraph/hedera-wallet-connect @walletconnect/modal @walletconnect/qrcode-modal @walletconnect/utils @walletconnect/types @walletconnect/modal-core fetch-retry
 ```
 
 ## Usage
@@ -52,7 +52,7 @@ const sdk = window.HashinalsWalletConnectSDK;
 Import and use the SDK:
 
 ```javascript
-import { HashinalsWalletConnectSDK } from '@hashgraphonline/hashinals-wc';
+import { HashinalsWalletConnectSDK } from '@hashgraphonline/hashinal-wc';
 const sdk = HashinalsWalletConnectSDK.getInstance();
 ```
 
@@ -78,7 +78,7 @@ await window.HashinalsWalletConnectSDK.init(projectId, metadata);
 ESM Example:
 
 ```javascript
-import { HashinalsWalletConnectSDK } from '@hashgraphonline/hashinals-wc';
+import { HashinalsWalletConnectSDK } from '@hashgraphonline/hashinal-wc';
 import { LedgerId } from '@hashgraph/sdk';
 
 const sdk = HashinalsWalletConnectSDK.getInstance();
