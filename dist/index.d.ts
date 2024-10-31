@@ -38,6 +38,9 @@ declare class HashinalsWalletConnectSDK {
     createToken(name: string, symbol: string, initialSupply: number, decimals: number, treasuryAccountId: string, adminKey: string, supplyKey: string): Promise<string>;
     mintNFT(tokenId: string, metadata: string, supplyKey: PrivateKey): Promise<TransactionReceipt>;
     getMessages(topicId: string, lastTimestamp?: number, disableTimestampFilter?: boolean): Promise<FetchMessagesResult>;
+    signMessage(message: string): Promise<{
+        userSignature: any;
+    }>;
     private saveConnectionInfo;
     loadConnectionInfo(): {
         accountId: string | null;
@@ -66,4 +69,5 @@ declare class HashinalsWalletConnectSDK {
     }>;
 }
 export * from './types';
+export * from './sign';
 export { HashinalsWalletConnectSDK, HashgraphSDK };

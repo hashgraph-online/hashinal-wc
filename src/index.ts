@@ -32,6 +32,7 @@ import {
   HederaJsonRpcMethod,
   DAppConnector,
   HederaChainId,
+  SignMessageResult,
 } from '@hashgraph/hedera-wallet-connect';
 import {
   Message,
@@ -503,6 +504,26 @@ class HashinalsWalletConnectSDK {
     }
   }
 
+  public async signMessage(message: string) {
+    const dAppConnector = this.dAppConnector;
+    if (!dAppConnector) {
+      throw new Error('No active connection or signer');
+    }
+
+    const accountInfo = this.getAccountInfo();
+    const accountId = accountInfo?.accountId;
+
+    const params = {
+      signerAccountId: `hedera:${this.network}:${accountId}`,
+      message,
+    };
+
+    const result = (await dAppConnector.signMessage(params)) as SignMessageResult;
+
+    // @ts-ignore
+    return { userSignature: result.signatureMap };
+  }
+
   private saveConnectionInfo(
     accountId: string | undefined,
     connectedNetwork?: string | undefined
@@ -790,4 +811,5 @@ if ('VITE_BUILD_FORMAT' === 'umd') {
 }
 
 export * from './types';
+export * from './sign';
 export { HashinalsWalletConnectSDK, HashgraphSDK };

@@ -1,6 +1,7 @@
 import * as HashgraphSDK from "@hashgraph/sdk";
 import { LedgerId, TopicMessageSubmitTransaction, TopicId, TransferTransaction, TransactionId, AccountId, Hbar, ContractExecuteTransaction, ContractId, TopicCreateTransaction, PrivateKey, TokenCreateTransaction, TokenType, TokenSupplyType, TokenMintTransaction, TokenId, AccountCreateTransaction, TokenAssociateTransaction, TokenDissociateTransaction, AccountUpdateTransaction, AccountAllowanceApproveTransaction } from "@hashgraph/sdk";
 import { DAppConnector, HederaJsonRpcMethod, HederaSessionEvent, HederaChainId } from "@hashgraph/hedera-wallet-connect";
+import { base64StringToSignatureMap, prefixMessageToSign, verifyMessageSignature } from "@hashgraph/hedera-wallet-connect";
 import retryFetch from "fetch-retry";
 var buffer = {};
 var base64Js = {};
@@ -2138,6 +2139,20 @@ class HashinalsWalletConnectSDK {
       };
     }
   }
+  async signMessage(message) {
+    const dAppConnector = this.dAppConnector;
+    if (!dAppConnector) {
+      throw new Error("No active connection or signer");
+    }
+    const accountInfo = this.getAccountInfo();
+    const accountId = accountInfo == null ? void 0 : accountInfo.accountId;
+    const params = {
+      signerAccountId: `hedera:${this.network}:${accountId}`,
+      message
+    };
+    const result = await dAppConnector.signMessage(params);
+    return { userSignature: result.signatureMap };
+  }
   saveConnectionInfo(accountId, connectedNetwork) {
     if (!accountId) {
       localStorage.removeItem("connectedAccountId");
@@ -2326,6 +2341,9 @@ export {
   HashgraphSDK,
   HashinalsWalletConnectSDK,
   Name,
-  Result
+  Result,
+  base64StringToSignatureMap,
+  prefixMessageToSign,
+  verifyMessageSignature
 };
 //# sourceMappingURL=hashinal-wc.es.js.map
