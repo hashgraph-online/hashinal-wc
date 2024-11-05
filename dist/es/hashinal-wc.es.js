@@ -1810,6 +1810,9 @@ var Result = /* @__PURE__ */ ((Result2) => {
   return Result2;
 })(Result || {});
 class HashinalsWalletConnectSDK {
+  get dAppConnector() {
+    return HashinalsWalletConnectSDK.dAppConnectorInstance;
+  }
   constructor(logger, network) {
     this.logger = logger || new DefaultLogger();
     this.network = network || LedgerId.MAINNET;
@@ -1847,22 +1850,26 @@ class HashinalsWalletConnectSDK {
   async init(projectId, metadata, network) {
     const chosenNetwork = network || this.network;
     const isMainnet = chosenNetwork.toString() === "mainnet";
-    this.dAppConnector = new DAppConnector(
+    if (HashinalsWalletConnectSDK.dAppConnectorInstance) {
+      return HashinalsWalletConnectSDK.dAppConnectorInstance;
+    }
+    HashinalsWalletConnectSDK.dAppConnectorInstance = new DAppConnector(
       metadata,
       chosenNetwork,
       projectId,
       Object.values(HederaJsonRpcMethod),
       [HederaSessionEvent.ChainChanged, HederaSessionEvent.AccountsChanged],
-      [isMainnet ? HederaChainId.Mainnet : HederaChainId.Testnet]
+      [isMainnet ? HederaChainId.Mainnet : HederaChainId.Testnet],
+      "debug"
     );
-    await this.dAppConnector.init({ logger: "error" });
-    this.dAppConnector.onSessionIframeCreated = (session) => {
+    await HashinalsWalletConnectSDK.dAppConnectorInstance.init({ logger: "error" });
+    HashinalsWalletConnectSDK.dAppConnectorInstance.onSessionIframeCreated = (session) => {
       this.handleNewSession(session);
     };
     this.logger.info(
       `Hedera Wallet Connect SDK initialized on ${chosenNetwork}`
     );
-    return this.dAppConnector;
+    return HashinalsWalletConnectSDK.dAppConnectorInstance;
   }
   async connect() {
     this.ensureInitialized();
@@ -1871,10 +1878,29 @@ class HashinalsWalletConnectSDK {
     return session;
   }
   async disconnect() {
+    var _a, _b;
     try {
       this.ensureInitialized();
-      await this.dAppConnector.disconnectAll();
-      this.logger.info("Disconnected from all wallets");
+      const accountInfo = this.getAccountInfo();
+      const accountId = accountInfo == null ? void 0 : accountInfo.accountId;
+      const network = accountInfo == null ? void 0 : accountInfo.network;
+      const signer = (_a = this == null ? void 0 : this.dAppConnector) == null ? void 0 : _a.signers.find(
+        (signer_) => signer_.getAccountId().toString() === accountId
+      );
+      await ((_b = this.dAppConnector) == null ? void 0 : _b.disconnect(signer == null ? void 0 : signer.topic));
+      this.logger.info(`Disconnected from ${accountId} on ${network}`);
+      return true;
+    } catch (e) {
+      this.logger.error("Failed to disconnect", e);
+      return false;
+    }
+  }
+  async disconnectAll() {
+    var _a;
+    try {
+      this.ensureInitialized();
+      await ((_a = this.dAppConnector) == null ? void 0 : _a.disconnectAll());
+      this.logger.info(`Disconnected from all wallets`);
       return true;
     } catch (e) {
       this.logger.error("Failed to disconnect", e);

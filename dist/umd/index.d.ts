@@ -6,9 +6,10 @@ import { ILogger } from './logger/logger';
 import * as HashgraphSDK from '@hashgraph/sdk';
 declare class HashinalsWalletConnectSDK {
     private static instance;
-    dAppConnector: DAppConnector | undefined;
+    private static dAppConnectorInstance;
     private logger;
     private network;
+    get dAppConnector(): DAppConnector;
     constructor(logger?: ILogger, network?: LedgerId);
     static getInstance(logger?: ILogger, network?: LedgerId): HashinalsWalletConnectSDK;
     setLogger(logger: ILogger): void;
@@ -18,6 +19,7 @@ declare class HashinalsWalletConnectSDK {
     init(projectId: string, metadata: SignClientTypes.Metadata, network?: LedgerId): Promise<DAppConnector>;
     connect(): Promise<SessionTypes.Struct>;
     disconnect(): Promise<boolean>;
+    disconnectAll(): Promise<boolean>;
     executeTransaction(tx: Transaction, disableSigner?: boolean): Promise<TransactionReceipt>;
     executeTransactionWithErrorHandling(tx: Transaction, disableSigner: boolean): Promise<{
         result?: TransactionReceipt;

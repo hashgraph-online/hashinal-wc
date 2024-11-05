@@ -145,6 +145,7 @@ export type HashinalsWalletConnectSDK = {
         session: SessionTypes.Struct;
     }>;
     disconnect: () => Promise<boolean>;
+    disconnectAll: () => Promise<boolean>;
     disconnectWallet: () => Promise<boolean>;
     loadConnectionInfo: () => string | null;
     saveConnectionInfo: (accountId: string) => void;
