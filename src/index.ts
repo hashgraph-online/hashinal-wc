@@ -99,7 +99,8 @@ class HashinalsWalletConnectSDK {
   public async init(
     projectId: string,
     metadata: SignClientTypes.Metadata,
-    network?: LedgerId
+    network?: LedgerId,
+    onSessionIframeCreated?: (session: SessionTypes.Struct) => void
   ): Promise<DAppConnector> {
     const chosenNetwork = network || this.network;
     const isMainnet = chosenNetwork.toString() === 'mainnet';
@@ -118,10 +119,17 @@ class HashinalsWalletConnectSDK {
       'debug'
     );
 
-    await HashinalsWalletConnectSDK.dAppConnectorInstance.init({ logger: 'error' });
+    await HashinalsWalletConnectSDK.dAppConnectorInstance.init({
+      logger: 'error',
+    });
 
-    HashinalsWalletConnectSDK.dAppConnectorInstance.onSessionIframeCreated = (session) => {
+    HashinalsWalletConnectSDK.dAppConnectorInstance.onSessionIframeCreated = (
+      session
+    ) => {
       this.handleNewSession(session);
+      if (onSessionIframeCreated) {
+        onSessionIframeCreated(session);
+      }
     };
 
     this.logger.info(
@@ -547,7 +555,9 @@ class HashinalsWalletConnectSDK {
       message,
     };
 
-    const result = (await dAppConnector.signMessage(params)) as SignMessageResult;
+    const result = (await dAppConnector.signMessage(
+      params
+    )) as SignMessageResult;
 
     // @ts-ignore
     return { userSignature: result.signatureMap };
