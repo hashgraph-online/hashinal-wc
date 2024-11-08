@@ -1847,7 +1847,7 @@ class HashinalsWalletConnectSDK {
       this.logger.warn("setLogLevel is only available for the default logger");
     }
   }
-  async init(projectId, metadata, network) {
+  async init(projectId, metadata, network, onSessionIframeCreated) {
     const chosenNetwork = network || this.network;
     const isMainnet = chosenNetwork.toString() === "mainnet";
     if (HashinalsWalletConnectSDK.dAppConnectorInstance) {
@@ -1862,9 +1862,15 @@ class HashinalsWalletConnectSDK {
       [isMainnet ? HederaChainId.Mainnet : HederaChainId.Testnet],
       "debug"
     );
-    await HashinalsWalletConnectSDK.dAppConnectorInstance.init({ logger: "error" });
+    await HashinalsWalletConnectSDK.dAppConnectorInstance.init({
+      logger: "error"
+    });
     HashinalsWalletConnectSDK.dAppConnectorInstance.onSessionIframeCreated = (session) => {
+      this.logger.info("new session from from iframe", session);
       this.handleNewSession(session);
+      if (onSessionIframeCreated) {
+        onSessionIframeCreated(session);
+      }
     };
     this.logger.info(
       `Hedera Wallet Connect SDK initialized on ${chosenNetwork}`
@@ -2176,7 +2182,9 @@ class HashinalsWalletConnectSDK {
       signerAccountId: `hedera:${this.network}:${accountId}`,
       message
     };
-    const result = await dAppConnector.signMessage(params);
+    const result = await dAppConnector.signMessage(
+      params
+    );
     return { userSignature: result.signatureMap };
   }
   saveConnectionInfo(accountId, connectedNetwork) {
@@ -2184,7 +2192,8 @@ class HashinalsWalletConnectSDK {
       localStorage.removeItem("connectedAccountId");
       localStorage.removeItem("connectedNetwork");
     } else {
-      localStorage.setItem("connectedNetwork", connectedNetwork);
+      const cleanNetwork = connectedNetwork == null ? void 0 : connectedNetwork.replace(/['"]+/g, "");
+      localStorage.setItem("connectedNetwork", cleanNetwork);
       localStorage.setItem("connectedAccountId", accountId);
     }
   }

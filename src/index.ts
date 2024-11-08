@@ -126,6 +126,7 @@ class HashinalsWalletConnectSDK {
     HashinalsWalletConnectSDK.dAppConnectorInstance.onSessionIframeCreated = (
       session
     ) => {
+      this.logger.info('new session from from iframe', session);
       this.handleNewSession(session);
       if (onSessionIframeCreated) {
         onSessionIframeCreated(session);
@@ -571,7 +572,8 @@ class HashinalsWalletConnectSDK {
       localStorage.removeItem('connectedAccountId');
       localStorage.removeItem('connectedNetwork');
     } else {
-      localStorage.setItem('connectedNetwork', connectedNetwork);
+      const cleanNetwork = connectedNetwork?.replace(/['"]+/g, '');
+      localStorage.setItem('connectedNetwork', cleanNetwork);
       localStorage.setItem('connectedAccountId', accountId);
     }
   }

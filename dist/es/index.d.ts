@@ -16,7 +16,7 @@ declare class HashinalsWalletConnectSDK {
     setNetwork(network: LedgerId): void;
     getNetwork(): LedgerId;
     setLogLevel(level: 'error' | 'warn' | 'info' | 'debug'): void;
-    init(projectId: string, metadata: SignClientTypes.Metadata, network?: LedgerId): Promise<DAppConnector>;
+    init(projectId: string, metadata: SignClientTypes.Metadata, network?: LedgerId, onSessionIframeCreated?: (session: SessionTypes.Struct) => void): Promise<DAppConnector>;
     connect(): Promise<SessionTypes.Struct>;
     disconnect(): Promise<boolean>;
     disconnectAll(): Promise<boolean>;
