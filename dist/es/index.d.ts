@@ -1,7 +1,7 @@
 import { SessionTypes, SignClientTypes } from '@walletconnect/types';
-import { Transaction, LedgerId, TransactionReceipt, ContractFunctionParameters, PrivateKey } from '@hashgraph/sdk';
+import { Transaction, AccountId, ContractId, LedgerId, TransactionReceipt, ContractFunctionParameters, PrivateKey } from '@hashgraph/sdk';
 import { DAppConnector } from '@hashgraph/hedera-wallet-connect';
-import { FetchMessagesResult, TokenBalance, HederaAccountResponse } from './types';
+import { FetchMessagesResult, TokenBalance, HederaAccountResponse, HederaTXResponse, Nft } from './types';
 import { ILogger } from './logger/logger';
 import * as HashgraphSDK from '@hashgraph/sdk';
 declare class HashinalsWalletConnectSDK {
@@ -69,6 +69,11 @@ declare class HashinalsWalletConnectSDK {
     getAccountTokens(accountId: string): Promise<{
         tokens: TokenBalance[];
     }>;
+    getTransaction(transactionId: string): Promise<HederaTXResponse | null>;
+    getTransactionByTimestamp(timestamp: string): Promise<HederaTXResponse | null>;
+    getAccountNFTs(accountId: string, tokenId?: string): Promise<Nft[]>;
+    validateNFTOwnership(serialNumber: string, accountId: string, tokenId: string): Promise<Nft | null>;
+    readSmartContract(data: string, fromAccount: AccountId, contractId: ContractId, estimate?: boolean, value?: number): Promise<any>;
 }
 export * from './types';
 export * from './sign';

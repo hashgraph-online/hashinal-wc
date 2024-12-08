@@ -39,6 +39,9 @@ import {
   FetchMessagesResult,
   TokenBalance,
   HederaAccountResponse,
+  HederaTXResponse,
+  HBarNFT,
+  Nft,
 } from './types';
 import { DefaultLogger, ILogger } from './logger/logger';
 import { fetchWithRetry } from './utils/retry';
@@ -841,6 +844,174 @@ class HashinalsWalletConnectSDK {
     } catch (error) {
       this.logger.error('Error fetching account tokens:', error);
       throw error;
+    }
+  }
+
+  public async getTransaction(
+    transactionId: string
+  ): Promise<HederaTXResponse | null> {
+    try {
+      const networkPrefix = this.getNetworkPrefix();
+      const url = `https://${networkPrefix}.mirrornode.hedera.com/api/v1/transactions/${transactionId}`;
+
+      this.logger.debug('Fetching transaction', url);
+      const request = await fetchWithRetry()(url);
+
+      if (!request.ok) {
+        throw new Error(`Failed to fetch transaction: ${request.status}`);
+      }
+
+      return await request.json();
+    } catch (e) {
+      this.logger.error('Failed to get transaction', e);
+      return null;
+    }
+  }
+
+  public async getTransactionByTimestamp(
+    timestamp: string
+  ): Promise<HederaTXResponse | null> {
+    try {
+      const networkPrefix = this.getNetworkPrefix();
+      const url = `https://${networkPrefix}.mirrornode.hedera.com/api/v1/transactions?timestamp=${timestamp}`;
+
+      this.logger.debug('Fetching transaction by timestamp', url);
+      const request = await fetchWithRetry()(url);
+
+      if (!request.ok) {
+        throw new Error(
+          `Failed to fetch transaction by timestamp: ${request.status}`
+        );
+      }
+
+      const response = (await request.json()) as HederaTXResponse;
+      const transaction = response?.transactions?.[0];
+
+      if (transaction) {
+        return await this.getTransaction(transaction.transaction_id);
+      }
+
+      return null;
+    } catch (e) {
+      this.logger.error('Failed to get transaction by timestamp', e);
+      return null;
+    }
+  }
+
+  public async getAccountNFTs(
+    accountId: string,
+    tokenId?: string
+  ): Promise<Nft[]> {
+    try {
+      const networkPrefix = this.getNetworkPrefix();
+      const tokenQuery = tokenId ? `&token.id=${tokenId}` : '';
+      const url = `https://${networkPrefix}.mirrornode.hedera.com/api/v1/accounts/${accountId}/nfts?limit=200${tokenQuery}`;
+
+      const request = await fetchWithRetry()(url);
+      if (!request.ok) {
+        throw new Error(`Failed to fetch NFTs for account: ${request.status}`);
+      }
+
+      const response = (await request.json()) as HBarNFT;
+      let nextLink: string | null = response?.links?.next || null;
+      let nfts = response.nfts;
+
+      while (nextLink) {
+        try {
+          const nextRequest = await fetchWithRetry()(
+            `https://${networkPrefix}.mirrornode.hedera.com${nextLink}`
+          );
+
+          if (!nextRequest.ok) {
+            throw new Error(
+              `Failed to fetch next page of NFTs: ${nextRequest.status}`
+            );
+          }
+
+          const nextResponse = (await nextRequest.json()) as HBarNFT;
+          nfts = [...nfts, ...(nextResponse?.nfts || [])];
+
+          nextLink =
+            nextResponse?.links?.next && nextLink !== nextResponse?.links?.next
+              ? nextResponse.links.next
+              : null;
+        } catch (e) {
+          this.logger.error('Failed to fetch next page of NFTs', e);
+          break;
+        }
+      }
+
+      return nfts.map((nft) => {
+        try {
+          nft.token_uri = Buffer.from(nft.metadata, 'base64').toString('ascii');
+        } catch (e) {
+          this.logger.error('Failed to decode NFT metadata', e);
+        }
+        return nft;
+      });
+    } catch (e) {
+      this.logger.error('Failed to get account NFTs', e);
+      return [];
+    }
+  }
+
+  public async validateNFTOwnership(
+    serialNumber: string,
+    accountId: string,
+    tokenId: string
+  ): Promise<Nft | null> {
+    const userNFTs = await this.getAccountNFTs(accountId, tokenId);
+
+    return (
+      userNFTs.find(
+        (nft) =>
+          nft.token_id === tokenId &&
+          nft.serial_number.toString() === serialNumber
+      ) || null
+    );
+  }
+
+  public async readSmartContract(
+    data: string,
+    fromAccount: AccountId,
+    contractId: ContractId,
+    estimate: boolean = true,
+    value: number = 0
+  ): Promise<any> {
+    try {
+      const networkPrefix = this.getNetworkPrefix();
+      const body: any = {
+        block: 'latest',
+        data: data,
+        estimate: estimate,
+        from: fromAccount.toSolidityAddress(),
+        to: contractId.toSolidityAddress(),
+        value,
+      };
+
+      if (!estimate) {
+        body.gas = 300000;
+        body.gasPrice = 100000000;
+      }
+
+      const url = `https://${networkPrefix}.mirrornode.hedera.com/api/v1/contracts/call`;
+
+      const response = await fetchWithRetry()(url, {
+        method: 'POST',
+        body: JSON.stringify(body),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to make contract call: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (e) {
+      this.logger.error('Failed to make contract call', e);
+      return null;
     }
   }
 }

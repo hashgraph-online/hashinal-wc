@@ -18,6 +18,10 @@ This SDK provides a simple interface for interacting with the Hedera Hashgraph u
 - Dissociate tokens from accounts
 - Update account properties
 - Approve token allowances
+- Get transaction details by transaction ID or timestamp from the mirror node
+- Get account NFTs with optional filtering by token ID
+- Validate NFT ownership by serial number and token ID
+- Make read-only calls to smart contracts on the mirror node
 
 ## Installation
 
@@ -516,6 +520,109 @@ ESM Example:
 const accountId = '0.0.1234567';
 const tokens = await sdk.getAccountTokens(accountId);
 console.log('Account tokens:', tokens);
+```
+
+### `getTransaction(transactionId: string)`
+
+Retrieves transaction details by transaction ID from the mirror node.
+
+UMD Example:
+
+```javascript
+const transactionId = "0.0.123456@1234567890.000000000";
+const transaction = await window.HashinalsWalletConnectSDK.getTransaction(transactionId);
+console.log(transaction);
+```
+
+ESM Example:
+
+```javascript
+const transaction = await sdk.getTransaction(transactionId);
+```
+
+### `getTransactionByTimestamp(timestamp: string)`
+
+Retrieves transaction details by consensus timestamp from the mirror node.
+
+UMD Example:
+
+```javascript
+const timestamp = "1234567890.000000000";
+const transaction = await window.HashinalsWalletConnectSDK.getTransactionByTimestamp(timestamp);
+console.log(transaction);
+```
+
+ESM Example:
+
+```javascript
+const transaction = await sdk.getTransactionByTimestamp(timestamp);
+```
+
+### `getAccountNFTs(accountId: string, tokenId?: string)`
+
+Retrieves all NFTs owned by an account, with optional filtering by token ID.
+
+UMD Example:
+
+```javascript
+const accountId = "0.0.123456";
+const nfts = await window.HashinalsWalletConnectSDK.getAccountNFTs(accountId);
+console.log(nfts);
+
+// With token filter
+const tokenId = "0.0.789012";
+const filteredNfts = await window.HashinalsWalletConnectSDK.getAccountNFTs(accountId, tokenId);
+```
+
+ESM Example:
+
+```javascript
+const nfts = await sdk.getAccountNFTs(accountId);
+const filteredNfts = await sdk.getAccountNFTs(accountId, tokenId);
+```
+
+### `validateNFTOwnership(serialNumber: string, accountId: string, tokenId: string)`
+
+Validates if an account owns a specific NFT by serial number and token ID.
+
+UMD Example:
+
+```javascript
+const serialNumber = "1";
+const accountId = "0.0.123456";
+const tokenId = "0.0.789012";
+const nft = await window.HashinalsWalletConnectSDK.validateNFTOwnership(serialNumber, accountId, tokenId);
+console.log(nft ? "Account owns this NFT" : "Account does not own this NFT");
+```
+
+ESM Example:
+
+```javascript
+const nft = await sdk.validateNFTOwnership(serialNumber, accountId, tokenId);
+```
+
+### `readSmartContract(data: string, fromAccount: AccountId, contractId: ContractId, estimate?: boolean, value?: number)`
+
+Makes a read-only call to a smart contract on the mirror node.
+
+UMD Example:
+
+```javascript
+const data = "0x..."; // Contract call data
+const fromAccount = window.HashgraphSDK.AccountId.fromString("0.0.123456");
+const contractId = window.HashgraphSDK.ContractId.fromString("0.0.789012");
+const result = await window.HashinalsWalletConnectSDK.readSmartContract(data, fromAccount, contractId);
+console.log(result);
+```
+
+ESM Example:
+
+```javascript
+import { AccountId, ContractId } from '@hashgraph/sdk';
+
+const fromAccount = AccountId.fromString("0.0.123456");
+const contractId = ContractId.fromString("0.0.789012");
+const result = await sdk.readSmartContract(data, fromAccount, contractId);
 ```
 
 ## Versions and Topic IDs

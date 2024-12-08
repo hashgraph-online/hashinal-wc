@@ -5,6 +5,8 @@ import {
   TransactionReceipt,
   PrivateKey,
   Transaction,
+  AccountId,
+  ContractId,
 } from '@hashgraph/sdk';
 import { SessionTypes, SignClientTypes } from '@walletconnect/types';
 
@@ -159,6 +161,80 @@ export interface TokenBalance {
   formatted_balance: string;
 }
 
+export interface HederaTXResponse {
+  transactions: MirrorNodeTransaction[];
+}
+
+export interface MirrorNodeTransaction {
+  bytes: null;
+  charged_tx_fee: number;
+  consensus_timestamp: string;
+  entity_id: string;
+  max_fee: string;
+  memo_base64: string;
+  name: string;
+  node: null | string;
+  nonce: number;
+  parent_consensus_timestamp: null | string;
+  result: string;
+  scheduled: boolean;
+  transaction_hash: string;
+  transaction_id: string;
+  transfers: Transfer[];
+  token_transfers: TokenTransfer[];
+  valid_duration_seconds: null | string;
+  valid_start_timestamp: string;
+  nft_transfers?: NftTransfer[];
+}
+
+export interface NftTransfer {
+  is_approval: boolean;
+  receiver_account_id: string;
+  sender_account_id: string;
+  serial_number: number;
+  token_id: string;
+}
+
+export interface TokenTransfer {
+  token_id: string;
+  account: string;
+  amount: number;
+}
+
+export interface HBarNFT {
+  nfts: Nft[];
+  links: Links;
+}
+
+export interface Links {
+  next: string;
+}
+
+export interface Nft {
+  account_id: string;
+  created_timestamp: string;
+  delegating_spender: null;
+  deleted: boolean;
+  metadata: string;
+  modified_timestamp: string;
+  serial_number: number;
+  spender: null;
+  token_id: string;
+  token_uri?: string;
+  owner_of?: string;
+}
+
+export interface FormattedOwner {
+  token_uri?: string;
+  chain?: string;
+  owner_of?: string;
+  token_address?: string;
+  token_id?: string;
+  account_id?: string;
+  serial_number?: number;
+  [key: string]: any;
+}
+
 export type HashinalsWalletConnectSDK = {
   run: () => void;
   init: (
@@ -170,9 +246,9 @@ export type HashinalsWalletConnectSDK = {
     PROJECT_ID: string,
     APP_METADATA: SignClientTypes.Metadata
   ): Promise<{
-    accountId: string;
-    balance: string;
-    session: SessionTypes.Struct;
+  accountId: string;
+  balance: string;
+  session: SessionTypes.Struct;
   }>;
   disconnect: () => Promise<boolean>;
   disconnectAll: () => Promise<boolean>;
@@ -187,6 +263,8 @@ export type HashinalsWalletConnectSDK = {
     tx: Transaction,
     disableSigner: boolean
   ) => Promise<{ result?: TransactionReceipt; error?: string }>;
+  result?: TransactionReceipt;
+  error?: string;
   submitMessageToTopic: (
     topicId: string,
     message: string
@@ -226,10 +304,8 @@ export type HashinalsWalletConnectSDK = {
   dAppConnector?: DAppConnector;
   getMessages: (
     topicId: string,
-    collectedMessages: Message[],
     lastTimestamp?: number,
-    disableTimestampFilter?: boolean,
-    nextUrl?: string
+    disableTimestampFilter?: boolean
   ) => Promise<FetchMessagesResult>;
   initAccount: (
     PROJECT_ID: string,
@@ -261,5 +337,16 @@ export type HashinalsWalletConnectSDK = {
     ownerAccountId: string
   ) => Promise<TransactionReceipt>;
   getAccountTokens: (accountId: string) => Promise<{ tokens: TokenBalance[] }>;
+  getTransaction: (transactionId: string) => Promise<HederaTXResponse | null>;
+  getTransactionByTimestamp: (timestamp: string) => Promise<HederaTXResponse | null>;
+  getAccountNFTs: (accountId: string, tokenId?: string) => Promise<Nft[]>;
+  validateNFTOwnership: (serialNumber: string, accountId: string, tokenId: string) => Promise<Nft | null>;
+  readSmartContract: (
+    data: string,
+    fromAccount: AccountId,
+    contractId: ContractId,
+    estimate?: boolean,
+    value?: number
+  ) => Promise<any>;
   HashgraphSDK: typeof hashgraph;
 };
