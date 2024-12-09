@@ -1810,12 +1810,14 @@ var Result = /* @__PURE__ */ ((Result2) => {
   return Result2;
 })(Result || {});
 class HashinalsWalletConnectSDK {
-  get dAppConnector() {
-    return HashinalsWalletConnectSDK.dAppConnectorInstance;
-  }
   constructor(logger, network) {
+    this.extensionCheckInterval = null;
+    this.hasCalledExtensionCallback = false;
     this.logger = logger || new DefaultLogger();
     this.network = network || LedgerId.MAINNET;
+  }
+  get dAppConnector() {
+    return HashinalsWalletConnectSDK.dAppConnectorInstance;
   }
   static getInstance(logger, network) {
     let instance = HashinalsWalletConnectSDK == null ? void 0 : HashinalsWalletConnectSDK.instance;
@@ -2235,12 +2237,13 @@ class HashinalsWalletConnectSDK {
       return false;
     }
   }
-  async initAccount(PROJECT_ID, APP_METADATA) {
+  async initAccount(PROJECT_ID, APP_METADATA, networkOverride, onSessionIframeCreated = () => {
+  }) {
     const { accountId: savedAccountId, network: savedNetwork } = this.loadConnectionInfo();
     if (savedAccountId && savedNetwork) {
       try {
         const network = savedNetwork === "mainnet" ? LedgerId.MAINNET : LedgerId.TESTNET;
-        await this.init(PROJECT_ID, APP_METADATA, network);
+        await this.init(PROJECT_ID, APP_METADATA, network, onSessionIframeCreated);
         const balance = await this.getAccountBalance();
         return {
           accountId: savedAccountId,
@@ -2251,8 +2254,69 @@ class HashinalsWalletConnectSDK {
         this.saveConnectionInfo(void 0, void 0);
         return null;
       }
+    } else if (networkOverride) {
+      try {
+        this.logger.info("initializing normally through override.", networkOverride);
+        await this.init(PROJECT_ID, APP_METADATA, networkOverride, onSessionIframeCreated);
+        this.logger.info("initialized", networkOverride);
+        await this.connectViaDappBrowser();
+        this.logger.info("connected via dapp browser");
+      } catch (error) {
+        this.logger.error("Failed to fallback connect:", error);
+        this.saveConnectionInfo(void 0, void 0);
+        return null;
+      }
     }
     return null;
+  }
+  subscribeToExtensions(callback) {
+    if (this.extensionCheckInterval) {
+      clearInterval(this.extensionCheckInterval);
+    }
+    this.hasCalledExtensionCallback = false;
+    this.extensionCheckInterval = setInterval(() => {
+      var _a;
+      const extensions = ((_a = this.dAppConnector) == null ? void 0 : _a.extensions) || [];
+      const availableExtension = extensions.find((ext) => ext.availableInIframe);
+      if (availableExtension && !this.hasCalledExtensionCallback) {
+        this.hasCalledExtensionCallback = true;
+        callback(availableExtension);
+        if (this.extensionCheckInterval) {
+          clearInterval(this.extensionCheckInterval);
+          this.extensionCheckInterval = null;
+        }
+      }
+    }, 1e3);
+    return () => {
+      if (this.extensionCheckInterval) {
+        clearInterval(this.extensionCheckInterval);
+        this.extensionCheckInterval = null;
+      }
+      this.hasCalledExtensionCallback = false;
+    };
+  }
+  async connectViaDappBrowser() {
+    const extensions = this.dAppConnector.extensions || [];
+    const extension = extensions.find((ext) => {
+      this.logger.info("Checking extension", ext);
+      return ext.availableInIframe;
+    });
+    this.logger.info("extensions are", extensions, extension);
+    if (extension) {
+      await this.connectToExtension(extension);
+    } else {
+      this.subscribeToExtensions(async (newExtension) => {
+        await this.connectToExtension(newExtension);
+      });
+    }
+  }
+  async connectToExtension(extension) {
+    this.logger.info("found extension, connecting to iframe.", extension);
+    const session = await this.dAppConnector.connectExtension(extension.id);
+    const onSessionIframeCreated = this.dAppConnector.onSessionIframeCreated;
+    if (onSessionIframeCreated) {
+      onSessionIframeCreated(session);
+    }
   }
   ensureInitialized() {
     if (!this.dAppConnector) {

@@ -9,6 +9,8 @@ declare class HashinalsWalletConnectSDK {
     private static dAppConnectorInstance;
     private logger;
     private network;
+    private extensionCheckInterval;
+    private hasCalledExtensionCallback;
     get dAppConnector(): DAppConnector;
     constructor(logger?: ILogger, network?: LedgerId);
     static getInstance(logger?: ILogger, network?: LedgerId): HashinalsWalletConnectSDK;
@@ -54,10 +56,13 @@ declare class HashinalsWalletConnectSDK {
         session: SessionTypes.Struct;
     }>;
     disconnectWallet(clearStorage?: boolean): Promise<boolean>;
-    initAccount(PROJECT_ID: string, APP_METADATA: SignClientTypes.Metadata): Promise<{
+    initAccount(PROJECT_ID: string, APP_METADATA: SignClientTypes.Metadata, networkOverride?: LedgerId, onSessionIframeCreated?: (session: SessionTypes.Struct) => void): Promise<{
         accountId: string;
         balance: string;
     } | null>;
+    subscribeToExtensions(callback: (extension: any) => void): () => void;
+    connectViaDappBrowser(): Promise<void>;
+    private connectToExtension;
     private ensureInitialized;
     static run(): void;
     transferToken(tokenId: string, fromAccountId: string, toAccountId: string, amount: number): Promise<TransactionReceipt>;

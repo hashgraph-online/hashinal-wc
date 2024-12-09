@@ -51,6 +51,8 @@ class HashinalsWalletConnectSDK {
   private static dAppConnectorInstance: DAppConnector;
   private logger: ILogger;
   private network: LedgerId;
+  private extensionCheckInterval: NodeJS.Timeout | null = null;
+  private hasCalledExtensionCallback: boolean = false;
 
   public get dAppConnector(): DAppConnector {
     return HashinalsWalletConnectSDK.dAppConnectorInstance;
@@ -641,7 +643,9 @@ class HashinalsWalletConnectSDK {
 
   public async initAccount(
     PROJECT_ID: string,
-    APP_METADATA: SignClientTypes.Metadata
+    APP_METADATA: SignClientTypes.Metadata,
+    networkOverride?: LedgerId,
+    onSessionIframeCreated: (session: SessionTypes.Struct) => void = () => {}
   ): Promise<{ accountId: string; balance: string } | null> {
     const { accountId: savedAccountId, network: savedNetwork } =
       this.loadConnectionInfo();
@@ -650,7 +654,7 @@ class HashinalsWalletConnectSDK {
       try {
         const network =
           savedNetwork === 'mainnet' ? LedgerId.MAINNET : LedgerId.TESTNET;
-        await this.init(PROJECT_ID, APP_METADATA, network);
+        await this.init(PROJECT_ID, APP_METADATA, network, onSessionIframeCreated);
         const balance = await this.getAccountBalance();
         return {
           accountId: savedAccountId,
@@ -661,8 +665,81 @@ class HashinalsWalletConnectSDK {
         this.saveConnectionInfo(undefined, undefined);
         return null;
       }
+    } else if (networkOverride) {
+      try {
+        this.logger.info('initializing normally through override.', networkOverride);
+        await this.init(PROJECT_ID, APP_METADATA, networkOverride, onSessionIframeCreated);
+        this.logger.info('initialized', networkOverride);
+        await this.connectViaDappBrowser();
+        this.logger.info('connected via dapp browser');
+      } catch (error) {
+        this.logger.error('Failed to fallback connect:', error);
+        this.saveConnectionInfo(undefined, undefined);
+        return null;
+      }
     }
+
     return null;
+  }
+
+  public subscribeToExtensions(callback: (extension: any) => void) {
+    // Clear any existing interval and reset flag
+    if (this.extensionCheckInterval) {
+      clearInterval(this.extensionCheckInterval);
+    }
+    this.hasCalledExtensionCallback = false;
+
+    // Set up polling to check for extensions
+    this.extensionCheckInterval = setInterval(() => {
+      const extensions = this.dAppConnector?.extensions || [];
+      const availableExtension = extensions.find((ext) => ext.availableInIframe);
+      
+      if (availableExtension && !this.hasCalledExtensionCallback) {
+        this.hasCalledExtensionCallback = true;
+        callback(availableExtension);
+        // Clear the interval once we find an available extension
+        if (this.extensionCheckInterval) {
+          clearInterval(this.extensionCheckInterval);
+          this.extensionCheckInterval = null;
+        }
+      }
+    }, 1000); // Check every second
+
+    // Return cleanup function
+    return () => {
+      if (this.extensionCheckInterval) {
+        clearInterval(this.extensionCheckInterval);
+        this.extensionCheckInterval = null;
+      }
+      this.hasCalledExtensionCallback = false;
+    };
+  }
+
+  public async connectViaDappBrowser() {
+    const extensions = this.dAppConnector.extensions || [];
+    const extension = extensions.find((ext) => {
+      this.logger.info('Checking extension', ext);
+      return ext.availableInIframe;
+    });
+    this.logger.info('extensions are', extensions, extension);
+
+    if (extension) {
+      await this.connectToExtension(extension);
+    } else {
+      // If no extension is immediately available, subscribe to changes
+      this.subscribeToExtensions(async (newExtension) => {
+        await this.connectToExtension(newExtension);
+      });
+    }
+  }
+
+  private async connectToExtension(extension: any) {
+    this.logger.info('found extension, connecting to iframe.', extension);
+    const session = await this.dAppConnector.connectExtension(extension.id);
+    const onSessionIframeCreated = this.dAppConnector.onSessionIframeCreated;
+    if (onSessionIframeCreated) {
+      onSessionIframeCreated(session);
+    }
   }
 
   private ensureInitialized(): void {
