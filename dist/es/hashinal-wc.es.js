@@ -6105,7 +6105,8 @@ class HashinalsWalletConnectSDK {
     const { accountId: savedAccountId, network: savedNetwork } = this.loadConnectionInfo();
     if (savedAccountId && savedNetwork) {
       try {
-        const network = savedNetwork === "mainnet" ? LedgerId.MAINNET : LedgerId.TESTNET;
+        const defaultNetwork = savedNetwork === "mainnet" ? LedgerId.MAINNET : LedgerId.TESTNET;
+        const network = networkOverride || defaultNetwork;
         await this.init(PROJECT_ID, APP_METADATA, network, onSessionIframeCreated);
         const balance = await this.getAccountBalance();
         return {
