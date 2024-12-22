@@ -2419,7 +2419,7 @@ function pfGlobalThisOrFallback() {
 const qt = /* @__PURE__ */ getDefaultExportFromCjs$1(browser$1);
 const c = { level: "info" }, n = "custom_context";
 var x$1 = Object.defineProperty, S$1 = Object.defineProperties, _ = Object.getOwnPropertyDescriptors, p = Object.getOwnPropertySymbols, T = Object.prototype.hasOwnProperty, z$1 = Object.prototype.propertyIsEnumerable, f = (r, e, t) => e in r ? x$1(r, e, { enumerable: true, configurable: true, writable: true, value: t }) : r[e] = t, i = (r, e) => {
-  for (var t in e || (e = {})) T.call(e, t) && f(r, t, e[t]);
+  for (var t in e) T.call(e, t) && f(r, t, e[t]);
   if (p) for (var t of p(e)) z$1.call(e, t) && f(r, t, e[t]);
   return r;
 }, g = (r, e) => S$1(r, _(e));
@@ -5177,6 +5177,9 @@ class DAppConnector {
         this.signers = existingSessions.flatMap((session) => this.createSigners(session));
       else
         this.checkIframeConnect();
+      setInterval(() => {
+        this.validateAndRefreshSigners();
+      }, 1e4);
       this.walletConnectClient.on("session_event", this.handleSessionEvent.bind(this));
       this.walletConnectClient.on("session_update", this.handleSessionUpdate.bind(this));
       this.walletConnectClient.on("session_delete", this.handleSessionDelete.bind(this));
@@ -5292,18 +5295,26 @@ class DAppConnector {
         return false;
       }
       const session = this.walletConnectClient.session.get(topic);
-      const hasSigner = this.signers.some((signer) => signer.topic === topic);
+      const signer = this.signers.find((signer2) => signer2.topic === topic);
       if (!session) {
-        if (hasSigner) {
+        if (Boolean(signer)) {
           this.logger.warn(`Signer exists but no session found for topic: ${topic}`);
           this.handleSessionDelete({ topic });
         }
         return false;
       }
-      if (!hasSigner) {
+      if (!Boolean(signer)) {
         this.logger.warn(`Session exists but no signer found for topic: ${topic}`);
         return false;
       }
+      this.logger.info(`Session validated for topic: ${topic} - will extend expiry`);
+      this.walletConnectClient.extend({
+        topic
+      }).then(() => {
+        this.logger.info(`Session extended for topic: ${topic}`);
+      }).catch((e) => {
+        this.logger.error("Error extending session:", e);
+      });
       return true;
     } catch (e) {
       this.logger.error("Error validating session:", e);
