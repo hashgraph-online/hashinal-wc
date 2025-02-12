@@ -488,9 +488,10 @@ class HashinalsWalletConnectSDK {
   public async getMessages(
     topicId: string,
     lastTimestamp?: number,
-    disableTimestampFilter: boolean = false
+    disableTimestampFilter: boolean = false,
+    network?: string,
   ): Promise<FetchMessagesResult> {
-    const networkPrefix = this.getNetworkPrefix();
+    const networkPrefix = network || this.getNetworkPrefix();
     const baseUrl = `https://${networkPrefix}.mirrornode.hedera.com`;
     const timestampQuery =
       Number(lastTimestamp) > 0 && !disableTimestampFilter

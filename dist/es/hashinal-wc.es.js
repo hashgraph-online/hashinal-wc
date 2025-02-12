@@ -4880,11 +4880,15 @@ class DAppSigner {
     }
     if (this.extensionId)
       extensionOpen(this.extensionId);
-    return this.signClient.request({
+    const dAppRequest = {
       topic: this.topic,
       request,
-      chainId: ledgerIdToCAIPChainId(this.ledgerId)
-    });
+      chainId: ledgerIdToCAIPChainId(this.ledgerId),
+      // hardcode expiry to 5 minutes
+      expiry: 300
+    };
+    this.logger.debug("Sending request to wallet", dAppRequest);
+    return this.signClient.request(dAppRequest);
   }
   getAccountId() {
     return this.accountId;
@@ -5997,9 +6001,9 @@ class HashinalsWalletConnectSDK {
     let transaction = await new TokenMintTransaction().setTokenId(tokenId).setMetadata([Buffer$1.from(metadata, "utf-8")]).sign(supplyKey);
     return this.executeTransaction(transaction);
   }
-  async getMessages(topicId, lastTimestamp, disableTimestampFilter = false) {
+  async getMessages(topicId, lastTimestamp, disableTimestampFilter = false, network) {
     var _a, _b;
-    const networkPrefix = this.getNetworkPrefix();
+    const networkPrefix = network || this.getNetworkPrefix();
     const baseUrl = `https://${networkPrefix}.mirrornode.hedera.com`;
     const timestampQuery = Number(lastTimestamp) > 0 && !disableTimestampFilter ? `&timestamp=gt:${lastTimestamp}` : "";
     const url = `${baseUrl}/api/v1/topics/${topicId}/messages?limit=200${timestampQuery}`;

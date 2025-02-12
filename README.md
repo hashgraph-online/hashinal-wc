@@ -642,6 +642,7 @@ Version 1.0.58 and onward correlate with the NPM Package version.
 | v1.0.86 | 0.0.7770334 | UMD  |
 | v1.0.88 | 0.0.7797532 | UMD  |
 | v1.0.89 | 0.0.7812387 | UMD  |
+| v1.0.92 | 0.0.8084872 | UMD  |
 
 ## Contributing
 
