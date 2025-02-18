@@ -4880,15 +4880,11 @@ class DAppSigner {
     }
     if (this.extensionId)
       extensionOpen(this.extensionId);
-    const dAppRequest = {
+    return this.signClient.request({
       topic: this.topic,
       request,
-      chainId: ledgerIdToCAIPChainId(this.ledgerId),
-      // hardcode expiry to 5 minutes
-      expiry: 300
-    };
-    this.logger.debug("Sending request to wallet", dAppRequest);
-    return this.signClient.request(dAppRequest);
+      chainId: ledgerIdToCAIPChainId(this.ledgerId)
+    });
   }
   getAccountId() {
     return this.accountId;
@@ -5181,9 +5177,6 @@ class DAppConnector {
         this.signers = existingSessions.flatMap((session) => this.createSigners(session));
       else
         this.checkIframeConnect();
-      setInterval(() => {
-        this.validateAndRefreshSigners();
-      }, 1e4);
       this.walletConnectClient.on("session_event", this.handleSessionEvent.bind(this));
       this.walletConnectClient.on("session_update", this.handleSessionUpdate.bind(this));
       this.walletConnectClient.on("session_delete", this.handleSessionDelete.bind(this));
@@ -5299,26 +5292,18 @@ class DAppConnector {
         return false;
       }
       const session = this.walletConnectClient.session.get(topic);
-      const signer = this.signers.find((signer2) => signer2.topic === topic);
+      const hasSigner = this.signers.some((signer) => signer.topic === topic);
       if (!session) {
-        if (Boolean(signer)) {
+        if (hasSigner) {
           this.logger.warn(`Signer exists but no session found for topic: ${topic}`);
           this.handleSessionDelete({ topic });
         }
         return false;
       }
-      if (!Boolean(signer)) {
+      if (!hasSigner) {
         this.logger.warn(`Session exists but no signer found for topic: ${topic}`);
         return false;
       }
-      this.logger.info(`Session validated for topic: ${topic} - will extend expiry`);
-      this.walletConnectClient.extend({
-        topic
-      }).then(() => {
-        this.logger.info(`Session extended for topic: ${topic}`);
-      }).catch((e) => {
-        this.logger.error("Error extending session:", e);
-      });
       return true;
     } catch (e) {
       this.logger.error("Error validating session:", e);
@@ -5963,6 +5948,9 @@ class HashinalsWalletConnectSDK {
       (signer_) => signer_.getAccountId().toString() === cachedAccountId
     );
     const accountId = (_b = cachedSigner == null ? void 0 : cachedSigner.getAccountId()) == null ? void 0 : _b.toString();
+    if (!accountId) {
+      return null;
+    }
     const network = cachedSigner.getLedgerId();
     return {
       accountId,
@@ -6122,7 +6110,12 @@ class HashinalsWalletConnectSDK {
       try {
         const defaultNetwork = savedNetwork === "mainnet" ? LedgerId.MAINNET : LedgerId.TESTNET;
         const network = networkOverride || defaultNetwork;
-        await this.init(PROJECT_ID, APP_METADATA, network, onSessionIframeCreated);
+        await this.init(
+          PROJECT_ID,
+          APP_METADATA,
+          network,
+          onSessionIframeCreated
+        );
         const balance = await this.getAccountBalance();
         return {
           accountId: savedAccountId,
@@ -6135,8 +6128,16 @@ class HashinalsWalletConnectSDK {
       }
     } else if (networkOverride) {
       try {
-        this.logger.info("initializing normally through override.", networkOverride);
-        await this.init(PROJECT_ID, APP_METADATA, networkOverride, onSessionIframeCreated);
+        this.logger.info(
+          "initializing normally through override.",
+          networkOverride
+        );
+        await this.init(
+          PROJECT_ID,
+          APP_METADATA,
+          networkOverride,
+          onSessionIframeCreated
+        );
         this.logger.info("initialized", networkOverride);
         await this.connectViaDappBrowser();
         this.logger.info("connected via dapp browser");
@@ -6156,7 +6157,9 @@ class HashinalsWalletConnectSDK {
     this.extensionCheckInterval = setInterval(() => {
       var _a;
       const extensions = ((_a = this.dAppConnector) == null ? void 0 : _a.extensions) || [];
-      const availableExtension = extensions.find((ext) => ext.availableInIframe);
+      const availableExtension = extensions.find(
+        (ext) => ext.availableInIframe
+      );
       if (availableExtension && !this.hasCalledExtensionCallback) {
         this.hasCalledExtensionCallback = true;
         callback(availableExtension);

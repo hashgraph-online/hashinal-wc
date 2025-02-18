@@ -407,6 +407,9 @@ class HashinalsWalletConnectSDK {
       (signer_) => signer_.getAccountId().toString() === cachedAccountId
     );
     const accountId = cachedSigner?.getAccountId()?.toString();
+    if (!accountId) {
+      return null;
+    }
     const network = cachedSigner.getLedgerId();
     return {
       accountId,
@@ -489,7 +492,7 @@ class HashinalsWalletConnectSDK {
     topicId: string,
     lastTimestamp?: number,
     disableTimestampFilter: boolean = false,
-    network?: string,
+    network?: string
   ): Promise<FetchMessagesResult> {
     const networkPrefix = network || this.getNetworkPrefix();
     const baseUrl = `https://${networkPrefix}.mirrornode.hedera.com`;
@@ -656,7 +659,12 @@ class HashinalsWalletConnectSDK {
         const defaultNetwork =
           savedNetwork === 'mainnet' ? LedgerId.MAINNET : LedgerId.TESTNET;
         const network = networkOverride || defaultNetwork;
-        await this.init(PROJECT_ID, APP_METADATA, network, onSessionIframeCreated);
+        await this.init(
+          PROJECT_ID,
+          APP_METADATA,
+          network,
+          onSessionIframeCreated
+        );
         const balance = await this.getAccountBalance();
         return {
           accountId: savedAccountId,
@@ -669,8 +677,16 @@ class HashinalsWalletConnectSDK {
       }
     } else if (networkOverride) {
       try {
-        this.logger.info('initializing normally through override.', networkOverride);
-        await this.init(PROJECT_ID, APP_METADATA, networkOverride, onSessionIframeCreated);
+        this.logger.info(
+          'initializing normally through override.',
+          networkOverride
+        );
+        await this.init(
+          PROJECT_ID,
+          APP_METADATA,
+          networkOverride,
+          onSessionIframeCreated
+        );
         this.logger.info('initialized', networkOverride);
         await this.connectViaDappBrowser();
         this.logger.info('connected via dapp browser');
@@ -694,8 +710,10 @@ class HashinalsWalletConnectSDK {
     // Set up polling to check for extensions
     this.extensionCheckInterval = setInterval(() => {
       const extensions = this.dAppConnector?.extensions || [];
-      const availableExtension = extensions.find((ext) => ext.availableInIframe);
-      
+      const availableExtension = extensions.find(
+        (ext) => ext.availableInIframe
+      );
+
       if (availableExtension && !this.hasCalledExtensionCallback) {
         this.hasCalledExtensionCallback = true;
         callback(availableExtension);
