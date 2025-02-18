@@ -5947,6 +5947,9 @@ class HashinalsWalletConnectSDK {
     const cachedSigner = this.dAppConnector.signers.find(
       (signer_) => signer_.getAccountId().toString() === cachedAccountId
     );
+    if (!cachedSigner) {
+      return null;
+    }
     const accountId = (_b = cachedSigner == null ? void 0 : cachedSigner.getAccountId()) == null ? void 0 : _b.toString();
     if (!accountId) {
       return null;
