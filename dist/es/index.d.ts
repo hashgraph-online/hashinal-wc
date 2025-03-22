@@ -79,6 +79,11 @@ declare class HashinalsWalletConnectSDK {
     getAccountNFTs(accountId: string, tokenId?: string): Promise<Nft[]>;
     validateNFTOwnership(serialNumber: string, accountId: string, tokenId: string): Promise<Nft | null>;
     readSmartContract(data: string, fromAccount: AccountId, contractId: ContractId, estimate?: boolean, value?: number): Promise<any>;
+    generatePrivateAndPublicKey(): Promise<{
+        privateKey: string;
+        publicKey: string;
+    }>;
+    updateTopic(topicId: string, memo: string, adminKey: string): Promise<string>;
 }
 export * from './types';
 export * from './sign';
