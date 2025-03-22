@@ -25,6 +25,8 @@ import {
   AccountUpdateTransaction,
   AccountAllowanceApproveTransaction,
   TokenId,
+  client,
+  TopicUpdateTransaction
 } from '@hashgraph/sdk';
 import * as HashgraphSDK from '@hashgraph/sdk';
 import {
@@ -420,15 +422,33 @@ class HashinalsWalletConnectSDK {
     };
   }
 
+  
   public async generatePrivateAndPublicKey(): Promise<{
     privateKey: string;
     publicKey: string;
-  }> {
-    return this.dAppConnector.generatePrivateAndPublicKey();
+  }> {+
+       this.ensureInitialized();
+       const privateKey = await PrivateKey.generateED25519Async();
+    const publicKey = privateKey.publicKey;
+    return {
+      privateKey: privateKey.toString(),
+      publicKey: publicKey.toString()
+    };
   }
 
   public async updateTopic(topicId: string, memo: string, adminKey: string): Promise<string> {
-    return this.dAppConnector.updateTopic(topicId, memo, adminKey);
+     this.ensureInitialized();
+    let transaction = new TopicUpdateTransaction()
+      .setTopicId(TopicId.fromString(topicId))
+      .setTopicMemo(memo || "")
+      .freezeWith(client);
+      
+    // Convert the adminKey string back to a PrivateKey object
+    const privateKey = PrivateKey.fromString(adminKey);
+    const signedTx = await transaction.sign(privateKey);
+    
+    const receipt = await this.executeTransaction(signedTx);
+    return receipt.topicId.toString();
   }
 
   public async createTopic(
@@ -437,20 +457,20 @@ class HashinalsWalletConnectSDK {
     submitKey?: string
   ): Promise<string> {
     this.ensureInitialized();
-
-    let transaction = new TopicCreateTransaction().setTopicMemo(memo || '');
+    let transaction = new TopicCreateTransaction().setTopicMemo(memo || "");
 
     if (adminKey) {
       const adminWithPrivateKey = PrivateKey.fromString(adminKey);
       transaction.setAdminKey(adminWithPrivateKey.publicKey);
-      transaction = await transaction.sign(adminWithPrivateKey);
+      transaction.freezeWith(client); // Freeze after setting the admin key
+      transaction = await transaction.sign(adminWithPrivateKey); // Then sign
     }
 
     if (submitKey) {
       transaction.setSubmitKey(PrivateKey.fromString(submitKey).publicKey);
     }
 
-    const receipt = await this.executeTransaction(transaction);
+    const receipt = await this.executeTransaction(transaction, false); // Disable signing in executeTransaction
     return receipt.topicId!.toString();
   }
 
