@@ -5960,20 +5960,50 @@ class HashinalsWalletConnectSDK {
       network
     };
   }
+
   async createTopic(memo, adminKey, submitKey) {
     this.ensureInitialized();
     let transaction = new TopicCreateTransaction().setTopicMemo(memo || "");
+
     if (adminKey) {
       const adminWithPrivateKey = PrivateKey.fromString(adminKey);
       transaction.setAdminKey(adminWithPrivateKey.publicKey);
-      transaction = await transaction.sign(adminWithPrivateKey);
+      transaction.freezeWith(client); // Freeze after setting the admin key
+      transaction = await transaction.sign(adminWithPrivateKey); // Then sign
     }
+
     if (submitKey) {
       transaction.setSubmitKey(PrivateKey.fromString(submitKey).publicKey);
     }
-    const receipt = await this.executeTransaction(transaction);
+
+    const receipt = await this.executeTransaction(transaction, false); // Disable signing in executeTransaction
     return receipt.topicId.toString();
   }
+
+  async generatePrivateAndPublicKey() {
+    const privateKey = await PrivateKey.generateED25519Async();
+    const publicKey = privateKey.publicKey;
+    return {
+      privateKey: privateKey.toString(),
+      publicKey: publicKey.toString()
+    };
+  }
+
+  async updateTopic(topicId, memo, adminKey) {
+    this.ensureInitialized();
+    let transaction = new TopicUpdateTransaction()
+      .setTopicId(TopicId.fromString(topicId))
+      .setTopicMemo(memo || "")
+      .freezeWith(client);
+      
+    // Convert the adminKey string back to a PrivateKey object
+    const privateKey = PrivateKey.fromString(adminKey);
+    const signedTx = await transaction.sign(privateKey);
+    
+    const receipt = await this.executeTransaction(signedTx);
+    return receipt.topicId.toString();
+  }
+
   async createToken(name, symbol, initialSupply, decimals, treasuryAccountId, adminKey, supplyKey) {
     this.ensureInitialized();
     let transaction = new TokenCreateTransaction().setTokenName(name).setTokenSymbol(symbol).setDecimals(decimals).setInitialSupply(initialSupply).setTreasuryAccountId(AccountId.fromString(treasuryAccountId)).setTokenType(TokenType.NonFungibleUnique).setSupplyType(TokenSupplyType.Finite);
