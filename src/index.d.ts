@@ -126,6 +126,11 @@ declare class HashinalsWalletConnectSDK {
   getAccountTokens(accountId: string): Promise<{
     tokens: TokenBalance[];
   }>;
+  generatePrivateAndPublicKey(): Promise<{
+    privateKey: string;
+    publicKey: string;
+  }>;
+  updateTopic(topicId: string, memo: string, adminKey: string): Promise<string>;
 }
 
 declare global {

@@ -420,6 +420,17 @@ class HashinalsWalletConnectSDK {
     };
   }
 
+  public async generatePrivateAndPublicKey(): Promise<{
+    privateKey: string;
+    publicKey: string;
+  }> {
+    return this.dAppConnector.generatePrivateAndPublicKey();
+  }
+
+  public async updateTopic(topicId: string, memo: string, adminKey: string): Promise<string> {
+    return this.dAppConnector.updateTopic(topicId, memo, adminKey);
+  }
+
   public async createTopic(
     memo?: string,
     adminKey?: string,

@@ -287,6 +287,11 @@ export type HashinalsWalletConnectSDK = {
     adminKey?: string,
     submitKey?: string
   ) => Promise<string>;
+  generatePrivateAndPublicKey: () => Promise<{
+    privateKey: string;
+    publicKey: string;
+  }>;
+  updateTopic: (topicId: string, memo: string, adminKey: string) => Promise<string>;
   createToken: (
     name: string,
     symbol: string,
