@@ -426,7 +426,7 @@ class HashinalsWalletConnectSDK {
   public async generatePrivateAndPublicKey(): Promise<{
     privateKey: string;
     publicKey: string;
-  }> {+
+  }> {
        this.ensureInitialized();
        const privateKey = await PrivateKey.generateED25519Async();
     const publicKey = privateKey.publicKey;
@@ -448,7 +448,7 @@ class HashinalsWalletConnectSDK {
     const signedTx = await transaction.sign(privateKey);
     
     const receipt = await this.executeTransaction(signedTx);
-    return receipt.topicId.toString();
+    return receipt.topicId!.toString();
   }
 
   public async createTopic(

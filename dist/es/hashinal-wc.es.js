@@ -5981,6 +5981,7 @@ class HashinalsWalletConnectSDK {
   }
 
   async generatePrivateAndPublicKey() {
+    this.ensureInitialized();
     const privateKey = await PrivateKey.generateED25519Async();
     const publicKey = privateKey.publicKey;
     return {
