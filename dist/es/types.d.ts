@@ -251,4 +251,10 @@ export type HashinalsWalletConnectSDK = {
     validateNFTOwnership: (serialNumber: string, accountId: string, tokenId: string) => Promise<Nft | null>;
     readSmartContract: (data: string, fromAccount: AccountId, contractId: ContractId, estimate?: boolean, value?: number) => Promise<any>;
     HashgraphSDK: typeof hashgraph;
+    generatePrivateAndPublicKey: () => Promise<{
+        privateKey: string;
+        publicKey: string;
+    }>;
+    updateTopic: (topicId: string, memo: string, adminKey: string) => Promise<string>;
+    
 };
