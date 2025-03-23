@@ -427,12 +427,12 @@ class HashinalsWalletConnectSDK {
     privateKey: string;
     publicKey: string;
   }> {
-       this.ensureInitialized();
-       const privateKey = await PrivateKey.generateED25519Async();
+    this.ensureInitialized();
+    const privateKey = await PrivateKey.generateED25519Async();
     const publicKey = privateKey.publicKey;
     return {
       privateKey: privateKey.toString(),
-      publicKey: publicKey.toString()
+      publicKey: publicKey.toString(),
     };
   }
 
@@ -470,7 +470,7 @@ class HashinalsWalletConnectSDK {
       transaction.setSubmitKey(PrivateKey.fromString(submitKey).publicKey);
     }
 
-    const receipt = await this.executeTransaction(transaction, false); // Disable signing in executeTransaction
+    const receipt = await this.executeTransaction(transaction);
     return receipt.topicId!.toString();
   }
 
