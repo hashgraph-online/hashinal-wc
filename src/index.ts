@@ -432,7 +432,7 @@ class HashinalsWalletConnectSDK {
     const publicKey = privateKey.publicKey;
     return {
       privateKey: privateKey.toString(),
-      publicKey: publicKey.toString(),
+      publicKey: publicKey.toString()
     };
   }
 
