@@ -5960,26 +5960,21 @@ class HashinalsWalletConnectSDK {
       network
     };
   }
-
   async createTopic(memo, adminKey, submitKey) {
     this.ensureInitialized();
     let transaction = new TopicCreateTransaction().setTopicMemo(memo || "");
-
     if (adminKey) {
       const adminWithPrivateKey = PrivateKey.fromString(adminKey);
       transaction.setAdminKey(adminWithPrivateKey.publicKey);
       transaction.freezeWith(client); // Freeze after setting the admin key
       transaction = await transaction.sign(adminWithPrivateKey); // Then sign
     }
-
     if (submitKey) {
       transaction.setSubmitKey(PrivateKey.fromString(submitKey).publicKey);
     }
-
     const receipt = await this.executeTransaction(transaction, false); // Disable signing in executeTransaction
     return receipt.topicId.toString();
   }
-
   async generatePrivateAndPublicKey() {
     this.ensureInitialized();
     const privateKey = await PrivateKey.generateED25519Async();
@@ -5989,7 +5984,6 @@ class HashinalsWalletConnectSDK {
       publicKey: publicKey.toString()
     };
   }
-
   async updateTopic(topicId, memo, adminKey) {
     this.ensureInitialized();
     let transaction = new TopicUpdateTransaction()
@@ -6004,7 +5998,6 @@ class HashinalsWalletConnectSDK {
     const receipt = await this.executeTransaction(signedTx);
     return receipt.topicId.toString();
   }
-
   async createToken(name, symbol, initialSupply, decimals, treasuryAccountId, adminKey, supplyKey) {
     this.ensureInitialized();
     let transaction = new TokenCreateTransaction().setTokenName(name).setTokenSymbol(symbol).setDecimals(decimals).setInitialSupply(initialSupply).setTreasuryAccountId(AccountId.fromString(treasuryAccountId)).setTokenType(TokenType.NonFungibleUnique).setSupplyType(TokenSupplyType.Finite);
