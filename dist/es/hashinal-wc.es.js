@@ -5967,12 +5967,11 @@ class HashinalsWalletConnectSDK {
       const adminWithPrivateKey = PrivateKey.fromString(adminKey);
       transaction.setAdminKey(adminWithPrivateKey.publicKey);
       transaction.freezeWith(client); // Freeze after setting the admin key
-      transaction = await transaction.sign(adminWithPrivateKey); // Then sign
     }
     if (submitKey) {
       transaction.setSubmitKey(PrivateKey.fromString(submitKey).publicKey);
     }
-    const receipt = await this.executeTransaction(transaction, false); // Disable signing in executeTransaction
+    const receipt = await this.executeTransaction(transaction);
     return receipt.topicId.toString();
   }
   async generatePrivateAndPublicKey() {

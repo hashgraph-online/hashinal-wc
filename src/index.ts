@@ -463,7 +463,6 @@ class HashinalsWalletConnectSDK {
       const adminWithPrivateKey = PrivateKey.fromString(adminKey);
       transaction.setAdminKey(adminWithPrivateKey.publicKey);
       transaction.freezeWith(client); // Freeze after setting the admin key
-      transaction = await transaction.sign(adminWithPrivateKey); // Then sign
     }
 
     if (submitKey) {
