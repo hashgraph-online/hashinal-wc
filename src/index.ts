@@ -25,7 +25,7 @@ import {
   AccountUpdateTransaction,
   AccountAllowanceApproveTransaction,
   TokenId,
-  Client,
+  client,
   TopicUpdateTransaction
 } from '@hashgraph/sdk';
 import * as HashgraphSDK from '@hashgraph/sdk';
@@ -47,7 +47,7 @@ import {
 } from './types';
 import { DefaultLogger, ILogger } from './logger/logger';
 import { fetchWithRetry } from './utils/retry';
-const client = Client.forMainnet(); // Create an instance
+
 class HashinalsWalletConnectSDK {
   private static instance: HashinalsWalletConnectSDK;
   private static dAppConnectorInstance: DAppConnector;
