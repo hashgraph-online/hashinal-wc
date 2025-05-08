@@ -441,7 +441,7 @@ class HashinalsWalletConnectSDK {
     let transaction = new TopicUpdateTransaction()
       .setTopicId(TopicId.fromString(topicId))
       .setTopicMemo(memo || "")
-      .freezeWith(client);
+      .freezeWith(Client);
       
     // Convert the adminKey string back to a PrivateKey object
     const privateKey = PrivateKey.fromString(adminKey);
@@ -462,7 +462,7 @@ class HashinalsWalletConnectSDK {
     if (adminKey) {
       const adminWithPrivateKey = PrivateKey.fromString(adminKey);
       transaction.setAdminKey(adminWithPrivateKey.publicKey);
-      transaction.freezeWith(client); // Freeze after setting the admin key
+      transaction.freezeWith(Client); // Freeze after setting the admin key
     }
 
     if (submitKey) {
