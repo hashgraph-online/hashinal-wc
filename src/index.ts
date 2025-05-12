@@ -25,8 +25,8 @@ import {
   AccountUpdateTransaction,
   AccountAllowanceApproveTransaction,
   TokenId,
-  client,
-  TopicUpdateTransaction
+  TopicUpdateTransaction,
+  PublicKey
 } from '@hashgraph/sdk';
 import * as HashgraphSDK from '@hashgraph/sdk';
 import {
@@ -437,18 +437,87 @@ class HashinalsWalletConnectSDK {
   }
 
   public async updateTopic(topicId: string, memo: string, adminKey: string): Promise<string> {
-     this.ensureInitialized();
+    this.ensureInitialized();
+  
+    // Validate inputs
+    if (!topicId) {
+      throw new Error('Topic ID is required');
+    }
+    if (!adminKey) {
+      throw new Error('Admin key is required for topic update');
+    }
+  
+    // Get account info and signer
+    const accountInfo = this.getAccountInfo();
+    if (!accountInfo?.accountId) {
+      throw new Error('No connected account found');
+    }
+  
+    const signer = this.dAppConnector.signers.find(
+      (signer_) => signer_.getAccountId().toString() === accountInfo.accountId
+    );
+    if (!signer) {
+      throw new Error('No signer found for the connected account');
+    }
+  
+    // Validate network
+    if (signer.getLedgerId().toString() !== this.network.toString()) {
+      throw new Error('Network mismatch between signer and SDK configuration');
+    }
+  
+    // Create and configure the transaction
     let transaction = new TopicUpdateTransaction()
       .setTopicId(TopicId.fromString(topicId))
-      .setTopicMemo(memo || "")
-      .freezeWith(client);
-      
-    // Convert the adminKey string back to a PrivateKey object
-    const privateKey = PrivateKey.fromString(adminKey);
-    const signedTx = await transaction.sign(privateKey);
-    
-    const receipt = await this.executeTransaction(signedTx);
-    return receipt.topicId!.toString();
+      .setTopicMemo(memo || '');
+  
+    // Helper function to parse a key as either private or public key (for future-proofing)
+    const parseKey = (key: string, keyType: 'admin'): PublicKey => {
+      try {
+        const privateKey = PrivateKey.fromString(key);
+        this.logger.debug(`Parsed ${keyType} key as private key:`, privateKey.toString());
+        return privateKey.publicKey;
+      } catch (privateError) {
+        this.logger.debug(`Failed to parse ${keyType} key as private key:`, privateError);
+        try {
+          const publicKey = PublicKey.fromString(key);
+          this.logger.debug(`Parsed ${keyType} key as public key:`, publicKey.toString());
+          return publicKey;
+        } catch (publicError) {
+          this.logger.error(`Invalid ${keyType} key format:`, publicError);
+          throw new Error(`Invalid ${keyType} key format: ${publicError.message}`);
+        }
+      }
+    };
+  
+    // Handle admin key (set the key but don’t sign yet)
+    let adminPrivateKey: PrivateKey | null = null;
+    try {
+      adminPrivateKey = PrivateKey.fromString(adminKey);
+      transaction.setAdminKey(adminPrivateKey.publicKey);
+      this.logger.debug('Admin key set with private key:', adminPrivateKey.publicKey.toString());
+    } catch (e) {
+      this.logger.error('Invalid admin key provided:', e);
+      throw new Error('Invalid admin key format: Admin key must be a valid private key for topic update');
+    }
+  
+    // Freeze the transaction before signing
+    transaction = await transaction.freezeWithSigner(signer);
+    this.logger.debug('Transaction frozen with signer:', signer.getAccountId().toString());
+  
+    // Sign with admin private key (after freezing)
+    if (adminPrivateKey) {
+      transaction = await transaction.sign(adminPrivateKey);
+      this.logger.debug('Transaction signed with admin private key');
+    }
+  
+    // Execute the transaction, disabling internal signer freeze to avoid double-freezing
+    const { result, error } = await this.executeTransactionWithErrorHandling(transaction, true);
+    if (error) {
+      throw new Error(`Failed to update topic: ${error}`);
+    }
+  
+    this.logger.debug('Topic updated successfully with ID:', result.topicId!.toString());
+    return result.topicId!.toString();
   }
 
   public async createTopic(
@@ -457,20 +526,86 @@ class HashinalsWalletConnectSDK {
     submitKey?: string
   ): Promise<string> {
     this.ensureInitialized();
-    let transaction = new TopicCreateTransaction().setTopicMemo(memo || "");
-
+  
+    // Get account info and signer
+    const accountInfo = this.getAccountInfo();
+    if (!accountInfo?.accountId) {
+      throw new Error('No connected account found');
+    }
+  
+    const signer = this.dAppConnector.signers.find(
+      (signer_) => signer_.getAccountId().toString() === accountInfo.accountId
+    );
+    if (!signer) {
+      throw new Error('No signer found for the connected account');
+    }
+  
+    // Validate network
+    if (signer.getLedgerId().toString() !== this.network.toString()) {
+      throw new Error('Network mismatch between signer and SDK configuration');
+    }
+  
+    // Create and configure the transaction
+    let transaction = new TopicCreateTransaction().setTopicMemo(memo || '');
+  
+    // Helper function to parse a key as either private or public key
+    const parseKey = (key: string, keyType: 'admin' | 'submit'): PublicKey => {
+      try {
+        const privateKey = PrivateKey.fromString(key);
+        this.logger.debug(`Parsed ${keyType} key as private key:`, privateKey.toString());
+        return privateKey.publicKey;
+      } catch (privateError) {
+        this.logger.debug(`Failed to parse ${keyType} key as private key:`, privateError);
+        try {
+          const publicKey = PublicKey.fromString(key);
+          this.logger.debug(`Parsed ${keyType} key as public key:`, publicKey.toString());
+          return publicKey;
+        } catch (publicError) {
+          this.logger.error(`Invalid ${keyType} key format:`, publicError);
+          throw new Error(`Invalid ${keyType} key format: ${publicError.message}`);
+        }
+      }
+    };
+  
+    // Handle admin key (set the key but don’t sign yet)
+    let adminPrivateKey: PrivateKey | null = null;
     if (adminKey) {
-      const adminWithPrivateKey = PrivateKey.fromString(adminKey);
-      transaction.setAdminKey(adminWithPrivateKey.publicKey);
-      transaction.freezeWith(client); // Freeze after setting the admin key
+      try {
+        adminPrivateKey = PrivateKey.fromString(adminKey);
+        transaction.setAdminKey(adminPrivateKey.publicKey);
+        this.logger.debug('Admin key set with private key:', adminPrivateKey.publicKey.toString());
+      } catch {
+        const adminPublicKey = parseKey(adminKey, 'admin');
+        transaction.setAdminKey(adminPublicKey);
+        this.logger.debug('Admin key set with public key:', adminPublicKey.toString());
+      }
     }
-
+  
+    // Handle submit key
     if (submitKey) {
-      transaction.setSubmitKey(PrivateKey.fromString(submitKey).publicKey);
+      const submitPublicKey = parseKey(submitKey, 'submit');
+      transaction.setSubmitKey(submitPublicKey);
+      this.logger.debug('Submit key set:', submitPublicKey.toString());
     }
-
-    const receipt = await this.executeTransaction(transaction);
-    return receipt.topicId!.toString();
+  
+    // Freeze the transaction before signing
+    transaction = await transaction.freezeWithSigner(signer);
+    this.logger.debug('Transaction frozen with signer:', signer.getAccountId().toString());
+  
+    // Sign with admin private key if provided (after freezing)
+    if (adminPrivateKey) {
+      transaction = await transaction.sign(adminPrivateKey);
+      this.logger.debug('Transaction signed with admin private key');
+    }
+  
+    // Execute the transaction, disabling internal signer freeze to avoid double-freezing
+    const receipt = await this.executeTransaction(transaction, true);
+    if (!receipt.topicId) {
+      throw new Error('Failed to create topic: No topic ID in receipt');
+    }
+  
+    this.logger.debug('Topic created successfully with ID:', receipt.topicId.toString());
+    return receipt.topicId.toString();
   }
 
   public async createToken(
