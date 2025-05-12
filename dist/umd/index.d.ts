@@ -38,6 +38,11 @@ declare class HashinalsWalletConnectSDK {
         accountId: string;
         network: LedgerId;
     };
+    generatePrivateAndPublicKey(): Promise<{
+        privateKey: string;
+        publicKey: string;
+    }>;
+    updateTopic(topicId: string, memo: string, adminKey: string): Promise<string>;
     createTopic(memo?: string, adminKey?: string, submitKey?: string): Promise<string>;
     createToken(name: string, symbol: string, initialSupply: number, decimals: number, treasuryAccountId: string, adminKey: string, supplyKey: string): Promise<string>;
     mintNFT(tokenId: string, metadata: string, supplyKey: PrivateKey): Promise<TransactionReceipt>;
@@ -79,11 +84,6 @@ declare class HashinalsWalletConnectSDK {
     getAccountNFTs(accountId: string, tokenId?: string): Promise<Nft[]>;
     validateNFTOwnership(serialNumber: string, accountId: string, tokenId: string): Promise<Nft | null>;
     readSmartContract(data: string, fromAccount: AccountId, contractId: ContractId, estimate?: boolean, value?: number): Promise<any>;
-    generatePrivateAndPublicKey(): Promise<{
-        privateKey: string;
-        publicKey: string;
-    }>;
-    updateTopic(topicId: string, memo: string, adminKey: string): Promise<string>;
 }
 export * from './types';
 export * from './sign';

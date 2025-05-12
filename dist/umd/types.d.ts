@@ -228,6 +228,11 @@ export type HashinalsWalletConnectSDK = {
     getAccountBalance: () => Promise<string>;
     getAccountInfo: () => string;
     createTopic: (memo?: string, adminKey?: string, submitKey?: string) => Promise<string>;
+    generatePrivateAndPublicKey: () => Promise<{
+        privateKey: string;
+        publicKey: string;
+    }>;
+    updateTopic: (topicId: string, memo: string, adminKey: string) => Promise<string>;
     createToken: (name: string, symbol: string, initialSupply: number, decimals: number, treasuryAccountId: string, adminKey: string, supplyKey: string) => Promise<string>;
     mintNFT: (tokenId: string, metadata: string, supplyKey: PrivateKey) => Promise<TransactionReceipt>;
     dAppConnector?: DAppConnector;
@@ -251,9 +256,4 @@ export type HashinalsWalletConnectSDK = {
     validateNFTOwnership: (serialNumber: string, accountId: string, tokenId: string) => Promise<Nft | null>;
     readSmartContract: (data: string, fromAccount: AccountId, contractId: ContractId, estimate?: boolean, value?: number) => Promise<any>;
     HashgraphSDK: typeof hashgraph;
-    generatePrivateAndPublicKey: () => Promise<{
-        privateKey: string;
-        publicKey: string;
-    }>;
-    updateTopic: (topicId: string, memo: string, adminKey: string) => Promise<string>;
 };
