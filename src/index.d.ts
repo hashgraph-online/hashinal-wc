@@ -131,6 +131,7 @@ declare class HashinalsWalletConnectSDK {
     publicKey: string;
   }>;
   updateTopic(topicId: string, memo: string, adminKey: string): Promise<string>;
+  getTopicInfo(topicId: string): Promise<any>;
 }
 
 declare global {

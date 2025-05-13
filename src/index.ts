@@ -26,7 +26,8 @@ import {
   AccountAllowanceApproveTransaction,
   TokenId,
   TopicUpdateTransaction,
-  PublicKey
+  PublicKey,
+  TopicInfoQuery
 } from '@hashgraph/sdk';
 import * as HashgraphSDK from '@hashgraph/sdk';
 import {
@@ -654,6 +655,42 @@ class HashinalsWalletConnectSDK {
       .sign(supplyKey);
 
     return this.executeTransaction(transaction);
+  }
+
+  public async getTopicInfo(topicId: string, network?: string): Promise<any> {
+    this.ensureInitialized();
+  
+    try {
+      // Validate input
+      if (!topicId) {
+        throw new Error('Topic ID is required');
+      }
+  
+      // Determine the network prefix
+      const networkPrefix = network || this.getNetworkPrefix();
+      const baseUrl = `https://${networkPrefix}.mirrornode.hedera.com`;
+  
+      // Construct the URL for the topic info endpoint
+      const url = `${baseUrl}/api/v1/topics/${topicId}`;
+  
+      // Fetch the topic info
+      const response = await fetchWithRetry()(url);
+      if (!response.ok) {
+        throw new Error(
+          `Failed to make request to mirror node for topic info: ${response.status}`
+        );
+      }
+  
+      const data = await response.json();
+  
+      // Log the retrieved topic info
+      this.logger.info('Topic info retrieved:', data);
+  
+      return data;
+    } catch (error) {
+      this.logger.error('Error fetching topic info:', error);
+      throw new Error(`Failed to retrieve topic info: ${error.message}`);
+    }
   }
 
   public async getMessages(

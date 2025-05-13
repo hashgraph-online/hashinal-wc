@@ -245,6 +245,7 @@ export type HashinalsWalletConnectSDK = {
     getAccountTokens: (accountId: string) => Promise<{
         tokens: TokenBalance[];
     }>;
+    getTopicInfo: (topicId: string) => Promise<any>;
     getTransaction: (transactionId: string) => Promise<HederaTXResponse | null>;
     getTransactionByTimestamp: (timestamp: string) => Promise<HederaTXResponse | null>;
     getAccountNFTs: (accountId: string, tokenId?: string) => Promise<Nft[]>;

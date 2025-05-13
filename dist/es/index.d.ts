@@ -27,6 +27,7 @@ declare class HashinalsWalletConnectSDK {
         result?: TransactionReceipt;
         error?: string;
     }>;
+    getTopicInfo(topicId: string): Promise<any>;
     submitMessageToTopic(topicId: string, message: string, submitKey?: PrivateKey): Promise<TransactionReceipt>;
     transferHbar(fromAccountId: string, toAccountId: string, amount: number): Promise<TransactionReceipt>;
     executeSmartContract(contractId: string, functionName: string, parameters: ContractFunctionParameters, gas?: number): Promise<TransactionReceipt>;

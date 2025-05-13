@@ -291,6 +291,7 @@ export type HashinalsWalletConnectSDK = {
     privateKey: string;
     publicKey: string;
   }>;
+  getTopicInfo: (topicId: string) => Promise<any>;
   updateTopic: (topicId: string, memo: string, adminKey: string) => Promise<string>;
   createToken: (
     name: string,
