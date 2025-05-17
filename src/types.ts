@@ -285,7 +285,7 @@ export type HashinalsWalletConnectSDK = {
   createTopic: (
     memo?: string,
     adminKey?: string,
-    submitKey?: string
+    customFees?: { denominatingTokenId: string, amount: string, collectorAccountId: string }[] // Updated type
   ) => Promise<string>;
   generatePrivateAndPublicKey: () => Promise<{
     privateKey: string;

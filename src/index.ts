@@ -27,7 +27,8 @@ import {
   TokenId,
   TopicUpdateTransaction,
   PublicKey,
-  TopicInfoQuery
+  TopicInfoQuery,
+  CustomFixedFee
 } from '@hashgraph/sdk';
 import * as HashgraphSDK from '@hashgraph/sdk';
 import {
@@ -437,7 +438,10 @@ class HashinalsWalletConnectSDK {
     };
   }
 
-  public async updateTopic(topicId: string, memo: string, adminKey: string): Promise<string> {
+  public async updateTopic(topicId: string, memo: string, adminKey: string,
+    customFees?: { denominatingTokenId: string, amount: string, collectorAccountId: string }[],
+    feeScheduleKey?:string
+  ): Promise<string> {
     this.ensureInitialized();
   
     // Validate inputs
@@ -500,6 +504,29 @@ class HashinalsWalletConnectSDK {
       this.logger.error('Invalid admin key provided:', e);
       throw new Error('Invalid admin key format: Admin key must be a valid private key for topic update');
     }
+
+        // Handle custom fees if provided
+        if (customFees && customFees.length > 0) {
+          const hederaCustomFees = customFees.map(fee => {
+              // Validate fee structure
+              if (!fee.denominatingTokenId || !fee.amount || !fee.collectorAccountId) {
+                  throw new Error('Invalid custom fee: denominatingTokenId, amount, and collectorAccountId are required');
+              }
+              // Parse amount as a number
+              const feeAmount = parseFloat(fee.amount);
+              if (isNaN(feeAmount) || feeAmount <= 0) {
+                  throw new Error('Invalid amount: must be a positive number');
+              }
+              // Create a CustomFixedFee
+              const customFee = new CustomFixedFee()
+                  .setAmount(feeAmount)
+                  .setFeeCollectorAccountId(fee.collectorAccountId)
+                  .setDenominatingTokenId(fee.denominatingTokenId);
+              return customFee;
+          });
+          transaction.setCustomFees(hederaCustomFees);
+          this.logger.debug('Custom fixed fees set:', hederaCustomFees);
+      }
   
     // Freeze the transaction before signing
     transaction = await transaction.freezeWithSigner(signer);
@@ -510,6 +537,19 @@ class HashinalsWalletConnectSDK {
       transaction = await transaction.sign(adminPrivateKey);
       this.logger.debug('Transaction signed with admin private key');
     }
+
+      // Sign with fee schedule key if custom fees are provided
+  if (customFees && customFees.length > 0 && feeScheduleKey) {
+    let feeSchedulePrivateKey: PrivateKey;
+    try {
+      feeSchedulePrivateKey = PrivateKey.fromString(feeScheduleKey);
+      transaction = await transaction.sign(feeSchedulePrivateKey);
+      this.logger.debug('Transaction signed with fee schedule private key');
+    } catch (e) {
+      this.logger.error('Invalid fee schedule key provided:', e);
+      throw new Error('Invalid fee schedule key format: Fee schedule key must be a valid private key');
+    }
+  }
   
     // Execute the transaction, disabling internal signer freeze to avoid double-freezing
     const { result, error } = await this.executeTransactionWithErrorHandling(transaction, true);
@@ -524,90 +564,109 @@ class HashinalsWalletConnectSDK {
   public async createTopic(
     memo?: string,
     adminKey?: string,
-    submitKey?: string
-  ): Promise<string> {
+    customFees?: { denominatingTokenId: string, amount: string, collectorAccountId: string }[] // Updated type
+): Promise<string> {
     this.ensureInitialized();
-  
+
     // Get account info and signer
     const accountInfo = this.getAccountInfo();
     if (!accountInfo?.accountId) {
-      throw new Error('No connected account found');
+        throw new Error('No connected account found');
     }
-  
+
     const signer = this.dAppConnector.signers.find(
-      (signer_) => signer_.getAccountId().toString() === accountInfo.accountId
+        (signer_) => signer_.getAccountId().toString() === accountInfo.accountId
     );
     if (!signer) {
-      throw new Error('No signer found for the connected account');
+        throw new Error('No signer found for the connected account');
     }
-  
+
     // Validate network
     if (signer.getLedgerId().toString() !== this.network.toString()) {
-      throw new Error('Network mismatch between signer and SDK configuration');
+        throw new Error('Network mismatch between signer and SDK configuration');
     }
-  
+
     // Create and configure the transaction
     let transaction = new TopicCreateTransaction().setTopicMemo(memo || '');
-  
+
     // Helper function to parse a key as either private or public key
     const parseKey = (key: string, keyType: 'admin' | 'submit'): PublicKey => {
-      try {
-        const privateKey = PrivateKey.fromString(key);
-        this.logger.debug(`Parsed ${keyType} key as private key:`, privateKey.toString());
-        return privateKey.publicKey;
-      } catch (privateError) {
-        this.logger.debug(`Failed to parse ${keyType} key as private key:`, privateError);
         try {
-          const publicKey = PublicKey.fromString(key);
-          this.logger.debug(`Parsed ${keyType} key as public key:`, publicKey.toString());
-          return publicKey;
-        } catch (publicError) {
-          this.logger.error(`Invalid ${keyType} key format:`, publicError);
-          throw new Error(`Invalid ${keyType} key format: ${publicError.message}`);
+            const privateKey = PrivateKey.fromString(key);
+            this.logger.debug(`Parsed ${keyType} key as private key:`, privateKey.toString());
+            return privateKey.publicKey;
+        } catch (privateError) {
+            this.logger.debug(`Failed to parse ${keyType} key as private key:`, privateError);
+            try {
+                const publicKey = PublicKey.fromString(key);
+                this.logger.debug(`Parsed ${keyType} key as public key:`, publicKey.toString());
+                return publicKey;
+            } catch (publicError) {
+                this.logger.error(`Invalid ${keyType} key format:`, publicError);
+                throw new Error(`Invalid ${keyType} key format: ${publicError.message}`);
+            }
         }
-      }
     };
-  
+
     // Handle admin key (set the key but don’t sign yet)
     let adminPrivateKey: PrivateKey | null = null;
-    if (adminKey) {
-      try {
-        adminPrivateKey = PrivateKey.fromString(adminKey);
-        transaction.setAdminKey(adminPrivateKey.publicKey);
-        this.logger.debug('Admin key set with private key:', adminPrivateKey.publicKey.toString());
-      } catch {
-        const adminPublicKey = parseKey(adminKey, 'admin');
-        transaction.setAdminKey(adminPublicKey);
-        this.logger.debug('Admin key set with public key:', adminPublicKey.toString());
-      }
+// After setting the admin key
+if (adminKey) {
+  try {
+      adminPrivateKey = PrivateKey.fromString(adminKey);
+      transaction.setAdminKey(adminPrivateKey.publicKey);
+      transaction.setFeeScheduleKey(adminPrivateKey.publicKey); // Set feeScheduleKey to same as adminKey
+      this.logger.debug('Admin key and feeScheduleKey set with private key:', adminPrivateKey.publicKey.toString());
+  } catch {
+      const adminPublicKey = parseKey(adminKey, 'admin');
+      transaction.setAdminKey(adminPublicKey);
+      transaction.setFeeScheduleKey(adminPublicKey); // Set feeScheduleKey to same as adminKey
+      this.logger.debug('Admin key and feeScheduleKey set with public key:', adminPublicKey.toString());
+  }
+}
+
+    // Handle custom fees if provided
+    if (customFees && customFees.length > 0) {
+        const hederaCustomFees = customFees.map(fee => {
+            // Validate fee structure
+            if (!fee.denominatingTokenId || !fee.amount || !fee.collectorAccountId) {
+                throw new Error('Invalid custom fee: denominatingTokenId, amount, and collectorAccountId are required');
+            }
+            // Parse amount as a number
+            const feeAmount = parseFloat(fee.amount);
+            if (isNaN(feeAmount) || feeAmount <= 0) {
+                throw new Error('Invalid amount: must be a positive number');
+            }
+            // Create a CustomFixedFee
+            const customFee = new CustomFixedFee()
+                .setAmount(feeAmount)
+                .setFeeCollectorAccountId(fee.collectorAccountId)
+                .setDenominatingTokenId(fee.denominatingTokenId);
+            return customFee;
+        });
+        transaction.setCustomFees(hederaCustomFees);
+        this.logger.debug('Custom fixed fees set:', hederaCustomFees);
     }
-  
-    // Handle submit key
-    if (submitKey) {
-      const submitPublicKey = parseKey(submitKey, 'submit');
-      transaction.setSubmitKey(submitPublicKey);
-      this.logger.debug('Submit key set:', submitPublicKey.toString());
-    }
-  
+
     // Freeze the transaction before signing
     transaction = await transaction.freezeWithSigner(signer);
     this.logger.debug('Transaction frozen with signer:', signer.getAccountId().toString());
-  
+
     // Sign with admin private key if provided (after freezing)
     if (adminPrivateKey) {
-      transaction = await transaction.sign(adminPrivateKey);
-      this.logger.debug('Transaction signed with admin private key');
+        transaction = await transaction.sign(adminPrivateKey);
+        this.logger.debug('Transaction signed with admin private key');
     }
-  
+
     // Execute the transaction, disabling internal signer freeze to avoid double-freezing
     const receipt = await this.executeTransaction(transaction, true);
     if (!receipt.topicId) {
-      throw new Error('Failed to create topic: No topic ID in receipt');
+        throw new Error('Failed to create topic: No topic ID in receipt');
     }
-  
+
     this.logger.debug('Topic created successfully with ID:', receipt.topicId.toString());
     return receipt.topicId.toString();
-  }
+}
 
   public async createToken(
     name: string,

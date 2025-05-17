@@ -227,7 +227,17 @@ export type HashinalsWalletConnectSDK = {
     executeSmartContract: (contractId: string, functionName: string, parameters: ContractFunctionParameters, gas?: number) => Promise<TransactionReceipt>;
     getAccountBalance: () => Promise<string>;
     getAccountInfo: () => string;
-    createTopic: (memo?: string, adminKey?: string, submitKey?: string) => Promise<string>;
+    createTopic: (memo?: string, adminKey?: string, customFees?: {
+        denominatingTokenId: string;
+        amount: string;
+        collectorAccountId: string;
+    }[]) => Promise<string>;
+    generatePrivateAndPublicKey: () => Promise<{
+        privateKey: string;
+        publicKey: string;
+    }>;
+    getTopicInfo: (topicId: string) => Promise<any>;
+    updateTopic: (topicId: string, memo: string, adminKey: string) => Promise<string>;
     createToken: (name: string, symbol: string, initialSupply: number, decimals: number, treasuryAccountId: string, adminKey: string, supplyKey: string) => Promise<string>;
     mintNFT: (tokenId: string, metadata: string, supplyKey: PrivateKey) => Promise<TransactionReceipt>;
     dAppConnector?: DAppConnector;
@@ -245,17 +255,10 @@ export type HashinalsWalletConnectSDK = {
     getAccountTokens: (accountId: string) => Promise<{
         tokens: TokenBalance[];
     }>;
-    getTopicInfo: (topicId: string) => Promise<any>;
     getTransaction: (transactionId: string) => Promise<HederaTXResponse | null>;
     getTransactionByTimestamp: (timestamp: string) => Promise<HederaTXResponse | null>;
     getAccountNFTs: (accountId: string, tokenId?: string) => Promise<Nft[]>;
     validateNFTOwnership: (serialNumber: string, accountId: string, tokenId: string) => Promise<Nft | null>;
     readSmartContract: (data: string, fromAccount: AccountId, contractId: ContractId, estimate?: boolean, value?: number) => Promise<any>;
     HashgraphSDK: typeof hashgraph;
-    generatePrivateAndPublicKey: () => Promise<{
-        privateKey: string;
-        publicKey: string;
-    }>;
-    updateTopic: (topicId: string, memo: string, adminKey: string) => Promise<string>;
-    
 };

@@ -56,7 +56,7 @@ declare class HashinalsWalletConnectSDK {
   createTopic(
     memo?: string,
     adminKey?: string,
-    submitKey?: string
+    customFees?: { denominatingTokenId: string, amount: string, collectorAccountId: string }[] // Updated type
   ): Promise<string>;
   createToken(
     name: string,

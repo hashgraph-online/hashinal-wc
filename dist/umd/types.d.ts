@@ -227,7 +227,11 @@ export type HashinalsWalletConnectSDK = {
     executeSmartContract: (contractId: string, functionName: string, parameters: ContractFunctionParameters, gas?: number) => Promise<TransactionReceipt>;
     getAccountBalance: () => Promise<string>;
     getAccountInfo: () => string;
-    createTopic: (memo?: string, adminKey?: string, submitKey?: string) => Promise<string>;
+    createTopic: (memo?: string, adminKey?: string, customFees?: {
+        denominatingTokenId: string;
+        amount: string;
+        collectorAccountId: string;
+    }[]) => Promise<string>;
     generatePrivateAndPublicKey: () => Promise<{
         privateKey: string;
         publicKey: string;

@@ -27,7 +27,6 @@ declare class HashinalsWalletConnectSDK {
         result?: TransactionReceipt;
         error?: string;
     }>;
-    getTopicInfo(topicId: string): Promise<any>;
     submitMessageToTopic(topicId: string, message: string, submitKey?: PrivateKey): Promise<TransactionReceipt>;
     transferHbar(fromAccountId: string, toAccountId: string, amount: number): Promise<TransactionReceipt>;
     executeSmartContract(contractId: string, functionName: string, parameters: ContractFunctionParameters, gas?: number): Promise<TransactionReceipt>;
@@ -39,9 +38,19 @@ declare class HashinalsWalletConnectSDK {
         accountId: string;
         network: LedgerId;
     };
-    createTopic(memo?: string, adminKey?: string, submitKey?: string): Promise<string>;
+    generatePrivateAndPublicKey(): Promise<{
+        privateKey: string;
+        publicKey: string;
+    }>;
+    updateTopic(topicId: string, memo: string, adminKey: string): Promise<string>;
+    createTopic(memo?: string, adminKey?: string, customFees?: {
+        denominatingTokenId: string;
+        amount: string;
+        collectorAccountId: string;
+    }[]): Promise<string>;
     createToken(name: string, symbol: string, initialSupply: number, decimals: number, treasuryAccountId: string, adminKey: string, supplyKey: string): Promise<string>;
     mintNFT(tokenId: string, metadata: string, supplyKey: PrivateKey): Promise<TransactionReceipt>;
+    getTopicInfo(topicId: string, network?: string): Promise<any>;
     getMessages(topicId: string, lastTimestamp?: number, disableTimestampFilter?: boolean, network?: string): Promise<FetchMessagesResult>;
     signMessage(message: string): Promise<{
         userSignature: any;
@@ -80,11 +89,6 @@ declare class HashinalsWalletConnectSDK {
     getAccountNFTs(accountId: string, tokenId?: string): Promise<Nft[]>;
     validateNFTOwnership(serialNumber: string, accountId: string, tokenId: string): Promise<Nft | null>;
     readSmartContract(data: string, fromAccount: AccountId, contractId: ContractId, estimate?: boolean, value?: number): Promise<any>;
-    generatePrivateAndPublicKey(): Promise<{
-        privateKey: string;
-        publicKey: string;
-    }>;
-    updateTopic(topicId: string, memo: string, adminKey: string): Promise<string>;
 }
 export * from './types';
 export * from './sign';
