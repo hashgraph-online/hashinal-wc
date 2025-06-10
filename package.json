@@ -33,7 +33,7 @@
   },
   "dependencies": {
     "@hashgraph/proto": "^2.15.0",
-    "@hashgraph/sdk": "^2.55.1",
+    "@hashgraph/sdk": "latest",
     "@hashgraph/hedera-wallet-connect": "1.4.2",
     "@walletconnect/core": "^2.17.3",
     "@walletconnect/modal": "^2.7.0",

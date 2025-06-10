@@ -56,7 +56,7 @@ declare class HashinalsWalletConnectSDK {
   createTopic(
     memo?: string,
     adminKey?: string,
-    submitKey?: string
+    customFees?: { denominatingTokenId: string, amount: string, collectorAccountId: string }[] // Updated type
   ): Promise<string>;
   createToken(
     name: string,
@@ -126,6 +126,12 @@ declare class HashinalsWalletConnectSDK {
   getAccountTokens(accountId: string): Promise<{
     tokens: TokenBalance[];
   }>;
+  generatePrivateAndPublicKey(): Promise<{
+    privateKey: string;
+    publicKey: string;
+  }>;
+  updateTopic(topicId: string, memo: string, adminKey: string): Promise<string>;
+  getTopicInfo(topicId: string): Promise<any>;
 }
 
 declare global {

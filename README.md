@@ -30,7 +30,7 @@ This SDK provides a simple interface for interacting with the Hedera Hashgraph u
 No installation needed. Reference the script directly in your HTML:
 
 ```html
-<script data-src="hcs://1/0.0.7473819" data-script-id="wallet-connect"></script>
+<script data-src="hcs://1/0.0.8084872" data-script-id="wallet-connect"></script>
 ```
 
 ### For NPM projects (ESM)

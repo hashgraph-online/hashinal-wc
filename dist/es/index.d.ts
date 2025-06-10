@@ -38,9 +38,19 @@ declare class HashinalsWalletConnectSDK {
         accountId: string;
         network: LedgerId;
     };
-    createTopic(memo?: string, adminKey?: string, submitKey?: string): Promise<string>;
+    generatePrivateAndPublicKey(): Promise<{
+        privateKey: string;
+        publicKey: string;
+    }>;
+    updateTopic(topicId: string, memo: string, adminKey: string): Promise<string>;
+    createTopic(memo?: string, adminKey?: string, customFees?: {
+        denominatingTokenId: string;
+        amount: string;
+        collectorAccountId: string;
+    }[]): Promise<string>;
     createToken(name: string, symbol: string, initialSupply: number, decimals: number, treasuryAccountId: string, adminKey: string, supplyKey: string): Promise<string>;
     mintNFT(tokenId: string, metadata: string, supplyKey: PrivateKey): Promise<TransactionReceipt>;
+    getTopicInfo(topicId: string, network?: string): Promise<any>;
     getMessages(topicId: string, lastTimestamp?: number, disableTimestampFilter?: boolean, network?: string): Promise<FetchMessagesResult>;
     signMessage(message: string): Promise<{
         userSignature: any;

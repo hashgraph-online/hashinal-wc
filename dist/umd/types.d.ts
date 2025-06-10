@@ -227,7 +227,17 @@ export type HashinalsWalletConnectSDK = {
     executeSmartContract: (contractId: string, functionName: string, parameters: ContractFunctionParameters, gas?: number) => Promise<TransactionReceipt>;
     getAccountBalance: () => Promise<string>;
     getAccountInfo: () => string;
-    createTopic: (memo?: string, adminKey?: string, submitKey?: string) => Promise<string>;
+    createTopic: (memo?: string, adminKey?: string, customFees?: {
+        denominatingTokenId: string;
+        amount: string;
+        collectorAccountId: string;
+    }[]) => Promise<string>;
+    generatePrivateAndPublicKey: () => Promise<{
+        privateKey: string;
+        publicKey: string;
+    }>;
+    getTopicInfo: (topicId: string) => Promise<any>;
+    updateTopic: (topicId: string, memo: string, adminKey: string) => Promise<string>;
     createToken: (name: string, symbol: string, initialSupply: number, decimals: number, treasuryAccountId: string, adminKey: string, supplyKey: string) => Promise<string>;
     mintNFT: (tokenId: string, metadata: string, supplyKey: PrivateKey) => Promise<TransactionReceipt>;
     dAppConnector?: DAppConnector;

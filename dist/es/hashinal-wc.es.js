@@ -1,5 +1,5 @@
 import * as HashgraphSDK from "@hashgraph/sdk";
-import { LedgerId, AccountId, Client, AccountBalanceQuery, AccountInfoQuery, AccountRecordsQuery, SignerSignature, PublicKey, TransactionId, Transaction, TransactionResponse, TransactionRecord, AccountBalance, AccountInfo, TransactionReceiptQuery, TransactionReceipt, TransactionRecordQuery, Query, TopicMessageSubmitTransaction, TopicId, TransferTransaction, Hbar, ContractExecuteTransaction, ContractId, TopicCreateTransaction, PrivateKey, TokenCreateTransaction, TokenType, TokenSupplyType, TokenMintTransaction, TokenId, AccountCreateTransaction, TokenAssociateTransaction, TokenDissociateTransaction, AccountUpdateTransaction, AccountAllowanceApproveTransaction } from "@hashgraph/sdk";
+import { LedgerId, AccountId, Client, AccountBalanceQuery, AccountInfoQuery, AccountRecordsQuery, SignerSignature, PublicKey, TransactionId, Transaction, TransactionResponse, TransactionRecord, AccountBalance, AccountInfo, TransactionReceiptQuery, TransactionReceipt, TransactionRecordQuery, Query, TopicMessageSubmitTransaction, TopicId, TransferTransaction, Hbar, ContractExecuteTransaction, ContractId, PrivateKey, TopicUpdateTransaction, TopicCreateTransaction, CustomFixedFee, TokenCreateTransaction, TokenType, TokenSupplyType, TokenMintTransaction, TokenId, AccountCreateTransaction, TokenAssociateTransaction, TokenDissociateTransaction, AccountUpdateTransaction, AccountAllowanceApproveTransaction } from "@hashgraph/sdk";
 import { proto } from "@hashgraph/proto";
 import { Core, RELAYER_DEFAULT_PROTOCOL, TRANSPORT_TYPES, EVENT_CLIENT_SESSION_TRACES, EVENT_CLIENT_SESSION_ERRORS, EVENT_CLIENT_AUTHENTICATE_TRACES, EVENT_CLIENT_AUTHENTICATE_ERRORS, EVENT_CLIENT_PAIRING_ERRORS, EVENT_CLIENT_PAIRING_TRACES, RELAYER_EVENTS, VERIFY_SERVER, EXPIRER_EVENTS, PAIRING_EVENTS, Store } from "@walletconnect/core";
 import { getAppMetadata, getInternalError, calcExpiry, createDelayedPromise, engineEvent, getSdkError, getDeepLink, handleDeeplinkRedirect, isSessionCompatible, hashKey, parseChainId, createEncodedRecap, getRecapFromResources, mergeEncodedRecaps, TYPE_2, BASE64URL, getLinkModeURL, validateSignedCacao, getNamespacedDidChainId, getDidAddress, getMethodsFromRecap, getChainsFromRecap, buildNamespacesFromAuth, formatMessage, BASE64, hashMessage, isExpired, MemoryStore, isValidParams, isUndefined, isValidRelays, isValidObject, isValidRequiredNamespaces, isValidNamespaces, isConformingNamespaces, isValidString, isValidErrorReason, isValidRelay, isValidController, isValidNamespacesChainId, isValidRequest, isValidNamespacesRequest, isValidRequestExpiry, isValidResponse, isValidEvent, isValidNamespacesEvent, getSearchParamFromURL, isTestRun, isReactNative, parseExpirerTarget, isValidId, TYPE_1 } from "@walletconnect/utils";
@@ -5960,18 +5960,132 @@ class HashinalsWalletConnectSDK {
       network
     };
   }
-  async createTopic(memo, adminKey, submitKey) {
+  async generatePrivateAndPublicKey() {
     this.ensureInitialized();
+    const privateKey = await PrivateKey.generateED25519Async();
+    const publicKey = privateKey.publicKey;
+    return {
+      privateKey: privateKey.toString(),
+      publicKey: publicKey.toString()
+    };
+  }
+  async updateTopic(topicId, memo, adminKey) {
+    this.ensureInitialized();
+    if (!topicId) {
+      throw new Error("Topic ID is required");
+    }
+    if (!adminKey) {
+      throw new Error("Admin key is required for topic update");
+    }
+    const accountInfo = this.getAccountInfo();
+    if (!(accountInfo == null ? void 0 : accountInfo.accountId)) {
+      throw new Error("No connected account found");
+    }
+    const signer = this.dAppConnector.signers.find(
+      (signer_) => signer_.getAccountId().toString() === accountInfo.accountId
+    );
+    if (!signer) {
+      throw new Error("No signer found for the connected account");
+    }
+    if (signer.getLedgerId().toString() !== this.network.toString()) {
+      throw new Error("Network mismatch between signer and SDK configuration");
+    }
+    let transaction = new TopicUpdateTransaction().setTopicId(TopicId.fromString(topicId)).setTopicMemo(memo || "");
+    let adminPrivateKey = null;
+    try {
+      adminPrivateKey = PrivateKey.fromString(adminKey);
+      transaction.setAdminKey(adminPrivateKey.publicKey);
+      this.logger.debug("Admin key set with private key:", adminPrivateKey.publicKey.toString());
+    } catch (e) {
+      this.logger.error("Invalid admin key provided:", e);
+      throw new Error("Invalid admin key format: Admin key must be a valid private key for topic update");
+    }
+    transaction = await transaction.freezeWithSigner(signer);
+    this.logger.debug("Transaction frozen with signer:", signer.getAccountId().toString());
+    if (adminPrivateKey) {
+      transaction = await transaction.sign(adminPrivateKey);
+      this.logger.debug("Transaction signed with admin private key");
+    }
+    const { result, error } = await this.executeTransactionWithErrorHandling(transaction, true);
+    if (error) {
+      throw new Error(`Failed to update topic: ${error}`);
+    }
+    this.logger.debug("Topic updated successfully with ID:", result.topicId.toString());
+    return result.topicId.toString();
+  }
+  async createTopic(memo, adminKey, customFees) {
+    this.ensureInitialized();
+    const accountInfo = this.getAccountInfo();
+    if (!(accountInfo == null ? void 0 : accountInfo.accountId)) {
+      throw new Error("No connected account found");
+    }
+    const signer = this.dAppConnector.signers.find(
+      (signer_) => signer_.getAccountId().toString() === accountInfo.accountId
+    );
+    if (!signer) {
+      throw new Error("No signer found for the connected account");
+    }
+    if (signer.getLedgerId().toString() !== this.network.toString()) {
+      throw new Error("Network mismatch between signer and SDK configuration");
+    }
     let transaction = new TopicCreateTransaction().setTopicMemo(memo || "");
+    const parseKey = (key, keyType) => {
+      try {
+        const privateKey = PrivateKey.fromString(key);
+        this.logger.debug(`Parsed ${keyType} key as private key:`, privateKey.toString());
+        return privateKey.publicKey;
+      } catch (privateError) {
+        this.logger.debug(`Failed to parse ${keyType} key as private key:`, privateError);
+        try {
+          const publicKey = PublicKey.fromString(key);
+          this.logger.debug(`Parsed ${keyType} key as public key:`, publicKey.toString());
+          return publicKey;
+        } catch (publicError) {
+          this.logger.error(`Invalid ${keyType} key format:`, publicError);
+          throw new Error(`Invalid ${keyType} key format: ${publicError.message}`);
+        }
+      }
+    };
+    let adminPrivateKey = null;
     if (adminKey) {
-      const adminWithPrivateKey = PrivateKey.fromString(adminKey);
-      transaction.setAdminKey(adminWithPrivateKey.publicKey);
-      transaction = await transaction.sign(adminWithPrivateKey);
+      try {
+        adminPrivateKey = PrivateKey.fromString(adminKey);
+        transaction.setAdminKey(adminPrivateKey.publicKey);
+        transaction.setFeeScheduleKey(adminPrivateKey.publicKey);
+        this.logger.debug("Admin key and feeScheduleKey set with private key:", adminPrivateKey.publicKey.toString());
+      } catch {
+        const adminPublicKey = parseKey(adminKey, "admin");
+        transaction.setAdminKey(adminPublicKey);
+        transaction.setFeeScheduleKey(adminPublicKey);
+        this.logger.debug("Admin key and feeScheduleKey set with public key:", adminPublicKey.toString());
+      }
     }
-    if (submitKey) {
-      transaction.setSubmitKey(PrivateKey.fromString(submitKey).publicKey);
+    if (customFees && customFees.length > 0) {
+      const hederaCustomFees = customFees.map((fee) => {
+        if (!fee.denominatingTokenId || !fee.amount || !fee.collectorAccountId) {
+          throw new Error("Invalid custom fee: denominatingTokenId, amount, and collectorAccountId are required");
+        }
+        const feeAmount = parseFloat(fee.amount);
+        if (isNaN(feeAmount) || feeAmount <= 0) {
+          throw new Error("Invalid amount: must be a positive number");
+        }
+        const customFee = new CustomFixedFee().setAmount(feeAmount).setFeeCollectorAccountId(fee.collectorAccountId).setDenominatingTokenId(fee.denominatingTokenId);
+        return customFee;
+      });
+      transaction.setCustomFees(hederaCustomFees);
+      this.logger.debug("Custom fixed fees set:", hederaCustomFees);
     }
-    const receipt = await this.executeTransaction(transaction);
+    transaction = await transaction.freezeWithSigner(signer);
+    this.logger.debug("Transaction frozen with signer:", signer.getAccountId().toString());
+    if (adminPrivateKey) {
+      transaction = await transaction.sign(adminPrivateKey);
+      this.logger.debug("Transaction signed with admin private key");
+    }
+    const receipt = await this.executeTransaction(transaction, true);
+    if (!receipt.topicId) {
+      throw new Error("Failed to create topic: No topic ID in receipt");
+    }
+    this.logger.debug("Topic created successfully with ID:", receipt.topicId.toString());
     return receipt.topicId.toString();
   }
   async createToken(name, symbol, initialSupply, decimals, treasuryAccountId, adminKey, supplyKey) {
@@ -5991,6 +6105,29 @@ class HashinalsWalletConnectSDK {
     this.ensureInitialized();
     let transaction = await new TokenMintTransaction().setTokenId(tokenId).setMetadata([Buffer$1.from(metadata, "utf-8")]).sign(supplyKey);
     return this.executeTransaction(transaction);
+  }
+  async getTopicInfo(topicId, network) {
+    this.ensureInitialized();
+    try {
+      if (!topicId) {
+        throw new Error("Topic ID is required");
+      }
+      const networkPrefix = network || this.getNetworkPrefix();
+      const baseUrl = `https://${networkPrefix}.mirrornode.hedera.com`;
+      const url = `${baseUrl}/api/v1/topics/${topicId}`;
+      const response = await fetchWithRetry()(url);
+      if (!response.ok) {
+        throw new Error(
+          `Failed to make request to mirror node for topic info: ${response.status}`
+        );
+      }
+      const data = await response.json();
+      this.logger.info("Topic info retrieved:", data);
+      return data;
+    } catch (error) {
+      this.logger.error("Error fetching topic info:", error);
+      throw new Error(`Failed to retrieve topic info: ${error.message}`);
+    }
   }
   async getMessages(topicId, lastTimestamp, disableTimestampFilter = false, network) {
     var _a, _b;
