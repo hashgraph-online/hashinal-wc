@@ -43,13 +43,13 @@ import {
   HBarNFT,
   Nft,
 } from './types';
-import { DefaultLogger, ILogger } from './logger/logger';
+import { Logger } from '@hashgraphonline/standards-sdk';
 import { fetchWithRetry } from './utils/retry';
 
 class HashinalsWalletConnectSDK {
   private static instance: HashinalsWalletConnectSDK;
   private static dAppConnectorInstance: DAppConnector;
-  private logger: ILogger;
+  private logger: Logger;
   private network: LedgerId;
   private extensionCheckInterval: NodeJS.Timeout | null = null;
   private hasCalledExtensionCallback: boolean = false;
@@ -58,13 +58,13 @@ class HashinalsWalletConnectSDK {
     return HashinalsWalletConnectSDK.dAppConnectorInstance;
   }
 
-  constructor(logger?: ILogger, network?: LedgerId) {
-    this.logger = logger || new DefaultLogger();
+  constructor(logger?: Logger, network?: LedgerId) {
+    this.logger = logger || new Logger();
     this.network = network || LedgerId.MAINNET;
   }
 
   public static getInstance(
-    logger?: ILogger,
+    logger?: Logger,
     network?: LedgerId
   ): HashinalsWalletConnectSDK {
     let instance = HashinalsWalletConnectSDK?.instance;
@@ -81,7 +81,7 @@ class HashinalsWalletConnectSDK {
     return instance;
   }
 
-  public setLogger(logger: ILogger): void {
+  public setLogger(logger: Logger): void {
     this.logger = logger;
   }
 
@@ -94,10 +94,8 @@ class HashinalsWalletConnectSDK {
   }
 
   public setLogLevel(level: 'error' | 'warn' | 'info' | 'debug'): void {
-    if (this.logger instanceof DefaultLogger) {
+    if (this.logger instanceof Logger) {
       this.logger.setLogLevel(level);
-    } else {
-      this.logger.warn('setLogLevel is only available for the default logger');
     }
   }
 

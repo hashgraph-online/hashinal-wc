@@ -2,7 +2,7 @@ import { SessionTypes, SignClientTypes } from '@walletconnect/types';
 import { Transaction, AccountId, ContractId, LedgerId, TransactionReceipt, ContractFunctionParameters, PrivateKey } from '@hashgraph/sdk';
 import { DAppConnector } from '@hashgraph/hedera-wallet-connect';
 import { FetchMessagesResult, TokenBalance, HederaAccountResponse, HederaTXResponse, Nft } from './types';
-import { ILogger } from './logger/logger';
+import { Logger } from '@hashgraphonline/standards-sdk';
 import * as HashgraphSDK from '@hashgraph/sdk';
 declare class HashinalsWalletConnectSDK {
     private static instance;
@@ -12,9 +12,9 @@ declare class HashinalsWalletConnectSDK {
     private extensionCheckInterval;
     private hasCalledExtensionCallback;
     get dAppConnector(): DAppConnector;
-    constructor(logger?: ILogger, network?: LedgerId);
-    static getInstance(logger?: ILogger, network?: LedgerId): HashinalsWalletConnectSDK;
-    setLogger(logger: ILogger): void;
+    constructor(logger?: Logger, network?: LedgerId);
+    static getInstance(logger?: Logger, network?: LedgerId): HashinalsWalletConnectSDK;
+    setLogger(logger: Logger): void;
     setNetwork(network: LedgerId): void;
     getNetwork(): LedgerId;
     setLogLevel(level: 'error' | 'warn' | 'info' | 'debug'): void;
