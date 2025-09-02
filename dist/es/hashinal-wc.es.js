@@ -1,4 +1,4 @@
-import { H, N, R, n, o, v } from "./index-DGtSCIDs.js";
+import { H, N, R, r, s, v } from "./index-i0G8ZAG9.js";
 import * as HashgraphSDK from "@hashgraph/sdk";
 import "@walletconnect/core";
 import "@walletconnect/utils";
@@ -8,8 +8,8 @@ export {
   H as HashinalsWalletConnectSDK,
   N as Name,
   R as Result,
-  n as base64StringToSignatureMap,
-  o as prefixMessageToSign,
+  r as base64StringToSignatureMap,
+  s as prefixMessageToSign,
   v as verifyMessageSignature
 };
 //# sourceMappingURL=hashinal-wc.es.js.map

@@ -1,6 +1,6 @@
 {
   "name": "@hashgraphonline/hashinal-wc",
-  "version": "1.0.102",
+  "version": "1.0.103",
   "description": "The official Hashinal Wallet Connect SDK. A set of easy-to-use functions to interact with Hedera through Wallet Connect.",
   "type": "module",
   "files": [
@@ -34,9 +34,9 @@
   },
   "dependencies": {
     "@hashgraph/proto": "^2.20.0",
-    "@hashgraph/sdk": "^2.69.0",
+    "@hashgraph/sdk": "^2.72.0",
     "@hashgraph/hedera-wallet-connect": "1.5.1",
-    "@hashgraphonline/standards-sdk": "0.0.162",
+    "@hashgraphonline/standards-sdk": "0.0.187",
     "@walletconnect/core": "^2.21.1",
     "@walletconnect/modal": "^2.7.0",
     "@walletconnect/modal-core": "^2.7.0",
@@ -73,5 +73,6 @@
     "webpack": "^5.93.0",
     "webpack-cli": "^5.1.4",
     "webpack-dev-server": "^5.0.4"
-  }
+  },
+  "packageManager": "pnpm@10.14.0+sha512.ad27a79641b49c3e481a16a805baa71817a04bbe06a38d17e60e2eaee83f6a146c6a688125f5792e48dd5ba30e7da52a5cda4c3992b9ccf333f9ce223af84748"
 }
