@@ -1,4 +1,4 @@
-import { H, N, R, r, s, v } from "./index-i0G8ZAG9.js";
+import { H, N, R, r, s, v } from "./index-C07cD5y_.js";
 import * as HashgraphSDK from "@hashgraph/sdk";
 import "@walletconnect/core";
 import "@walletconnect/utils";
