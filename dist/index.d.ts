@@ -3,10 +3,11 @@ import { Transaction, AccountId, ContractId, LedgerId, TransactionReceipt, Contr
 import * as HashgraphSDK from '@hashgraph/sdk';
 import { DAppConnector } from '@hashgraph/hedera-wallet-connect';
 import { FetchMessagesResult, TokenBalance, HederaAccountResponse, HederaTXResponse, Nft } from './types';
-import { Logger } from '@hashgraphonline/standards-sdk';
+import { Logger } from './logger';
 declare class HashinalsWalletConnectSDK {
     private static instance;
     private static dAppConnectorInstance;
+    private static proxyInstance;
     private logger;
     private network;
     private extensionCheckInterval;

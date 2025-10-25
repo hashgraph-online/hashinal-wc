@@ -2,11 +2,12 @@ import { SessionTypes, SignClientTypes } from '@walletconnect/types';
 import { Transaction, AccountId, ContractId, LedgerId, TransactionReceipt, ContractFunctionParameters, PrivateKey } from '@hashgraph/sdk';
 import { DAppConnector } from '@hashgraph/hedera-wallet-connect';
 import { FetchMessagesResult, TokenBalance, HederaAccountResponse, HederaTXResponse, Nft } from './types';
-import { Logger } from '@hashgraphonline/standards-sdk';
+import { Logger } from './logger';
 import * as HashgraphSDK from '@hashgraph/sdk';
 declare class HashinalsWalletConnectSDK {
     private static instance;
     private static dAppConnectorInstance;
+    private static proxyInstance;
     private logger;
     private network;
     private extensionCheckInterval;

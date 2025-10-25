@@ -1,3 +1,14 @@
+function ensureGlobalHTMLElement() {
+  if (typeof globalThis === 'undefined') {
+    return;
+  }
+  if (typeof (globalThis as any).HTMLElement === 'undefined') {
+    (globalThis as any).HTMLElement = class {};
+  }
+}
+
+ensureGlobalHTMLElement();
+
 import { Buffer } from 'buffer';
 import { SessionTypes, SignClientTypes } from '@walletconnect/types';
 import {
@@ -43,12 +54,13 @@ import {
   HBarNFT,
   Nft,
 } from './types';
-import { Logger } from '@hashgraphonline/standards-sdk';
+import { Logger } from './logger';
 import { fetchWithRetry } from './utils/retry';
 
 class HashinalsWalletConnectSDK {
   private static instance: HashinalsWalletConnectSDK;
   private static dAppConnectorInstance: DAppConnector;
+  private static proxyInstance: HashinalsWalletConnectSDK | null = null;
   private logger: Logger;
   private network: LedgerId;
   private extensionCheckInterval: NodeJS.Timeout | null = null;
@@ -74,11 +86,24 @@ class HashinalsWalletConnectSDK {
         network
       );
       instance = HashinalsWalletConnectSDK.instance;
+      HashinalsWalletConnectSDK.proxyInstance = null;
     }
     if (network) {
       instance.setNetwork(network);
     }
-    return instance;
+    if (!HashinalsWalletConnectSDK.proxyInstance) {
+      HashinalsWalletConnectSDK.proxyInstance =
+        new Proxy(instance, {
+          get(target, prop, receiver) {
+            const value = Reflect.get(target, prop, receiver);
+            if (typeof value === 'function') {
+              return value.bind(target);
+            }
+            return value;
+          },
+        }) as HashinalsWalletConnectSDK;
+    }
+    return HashinalsWalletConnectSDK.proxyInstance;
   }
 
   public setLogger(logger: Logger): void {
@@ -1012,7 +1037,7 @@ class HashinalsWalletConnectSDK {
 
       const response = (await request.json()) as HBarNFT;
       let nextLink: string | null = response?.links?.next || null;
-      let nfts = response.nfts;
+      let nfts: Nft[] = (response.nfts || []) as Nft[];
 
       while (nextLink) {
         try {
@@ -1027,7 +1052,8 @@ class HashinalsWalletConnectSDK {
           }
 
           const nextResponse = (await nextRequest.json()) as HBarNFT;
-          nfts = [...nfts, ...(nextResponse?.nfts || [])];
+          const nextNfts = (nextResponse?.nfts || []) as Nft[];
+          nfts = [...nfts, ...nextNfts];
 
           nextLink =
             nextResponse?.links?.next && nextLink !== nextResponse?.links?.next
@@ -1039,7 +1065,7 @@ class HashinalsWalletConnectSDK {
         }
       }
 
-      return nfts.map((nft) => {
+      return nfts.map((nft: Nft) => {
         try {
           nft.token_uri = Buffer.from(nft.metadata, 'base64').toString('ascii');
         } catch (e) {

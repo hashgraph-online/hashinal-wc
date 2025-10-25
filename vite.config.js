@@ -7,19 +7,67 @@ import commonjs from '@rollup/plugin-commonjs';
 
 export default defineConfig(({ mode }) => {
   const format = process.env.BUILD_FORMAT || 'es';
-  const outputDir = format === 'umd' ? 'dist/umd' : 'dist/es';
+  const outputDir =
+    format === 'umd' ? 'dist/umd' : format === 'cjs' ? 'dist/cjs' : 'dist/es';
   const isEsm = format === 'es';
+  const isCjs = format === 'cjs';
+  const isUmd = format === 'umd';
+  const cjsBanner = isCjs
+    ? `
+(function ensureHashinalSsrGlobals() {
+  if (typeof globalThis === 'undefined') return;
+  if (typeof globalThis.window === 'undefined') {
+    globalThis.window = globalThis;
+  }
+  if (typeof globalThis.matchMedia === 'undefined') {
+    globalThis.matchMedia = () => ({
+      matches: false,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    });
+  }
+  if (typeof globalThis.HTMLElement === 'undefined') {
+    globalThis.HTMLElement = class {};
+  }
+  if (typeof globalThis.customElements === 'undefined') {
+    const noop = () => {};
+    globalThis.customElements = {
+      define: noop,
+      get: () => undefined,
+      whenDefined: () => Promise.resolve(),
+    };
+  }
+  if (typeof globalThis.document === 'undefined') {
+    const noop = () => {};
+    const createElement = () => ({
+      style: {},
+      appendChild: noop,
+      setAttribute: noop,
+      removeAttribute: noop,
+      addEventListener: noop,
+      removeEventListener: noop,
+    });
+    globalThis.document = {
+      createElement,
+      createComment: () => ({}),
+      createTextNode: () => ({}),
+      createTreeWalker: () => ({ currentNode: null, nextNode: () => null }),
+      importNode: (node) => node,
+      body: { appendChild: noop, removeChild: noop },
+      head: { appendChild: noop, removeChild: noop },
+    };
+  }
+})();
+`.trim()
+    : undefined;
 
   // ESM does not bundle these to add flexibility e.g. for NextJS Apps.
   const externalDependencies = [
-    ...(isEsm ? [] : ['@hashgraph/hedera-wallet-connect']),
+    '@hashgraph/hedera-wallet-connect',
     '@hashgraph/proto',
     '@hashgraph/sdk',
-    '@walletconnect/modal',
     '@walletconnect/core',
-    '@walletconnect/modal-core',
-    '@walletconnect/qrcode-modal',
-    '@walletconnect/utils',
+    '@walletconnect/universal-provider',
     'fetch-retry',
   ];
 
@@ -38,8 +86,8 @@ export default defineConfig(({ mode }) => {
     }),
   ];
 
-  // Only add commonjs plugin for ESM build
-  if (isEsm) {
+  // Add commonjs plugin when we need to interop with CJS dependencies
+  if (isEsm || isCjs) {
     plugins.push(
       commonjs({
         include: /node_modules\/@hashgraph\/hedera-wallet-connect/,
@@ -54,19 +102,46 @@ export default defineConfig(({ mode }) => {
       lib: {
         entry: path.resolve(__dirname, 'src/index.ts'),
         name: 'HashinalsWalletConnectSDK',
-        fileName: (format) => `hashinal-wc.${format}.js`,
+        fileName: (fmt) =>
+          fmt === 'umd'
+            ? `hashinal-wc.umd.js`
+            : fmt === 'cjs'
+              ? `hashinal-wc.cjs`
+              : `index.js`,
         formats: [format],
       },
       rollupOptions: {
-        external: format === 'es' ? externalDependencies : [],
+        external: isUmd
+          ? []
+          : (id) => {
+              if (id.startsWith('.') || path.isAbsolute(id)) {
+                return false;
+              }
+              return true;
+            },
+        treeshake: {
+          moduleSideEffects: true,
+        },
         output: {
           globals: (id) => id,
+          exports: isCjs ? 'named' : undefined,
+          banner: cjsBanner,
+          preserveModules: isEsm,
+          preserveModulesRoot: isEsm ? 'src' : undefined,
+          entryFileNames: isEsm
+            ? '[name].js'
+            : isUmd
+              ? 'hashinal-wc.umd.js'
+              : isCjs
+                ? 'hashinal-wc.cjs'
+                : undefined,
+          chunkFileNames: isEsm ? '[name].js' : undefined,
         },
       },
       commonjsOptions: {
         include: [/node_modules/],
       },
-      minify: 'terser',
+      minify: isUmd ? 'esbuild' : false,
       sourcemap: true,
     },
     define: {
