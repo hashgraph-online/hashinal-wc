@@ -34,7 +34,7 @@
     "publish:canary": "npm publish --access public --tag canary"
   },
   "dependencies": {
-    "@hashgraph/hedera-wallet-connect": "2.0.3",
+    "@hashgraph/hedera-wallet-connect": "2.0.4-canary.3ca04e9.0",
     "@hashgraph/proto": "^2.22.0",
     "@hashgraph/sdk": "^2.75.0",
     "@hashgraphonline/standards-sdk": "0.1.121-canary.0",
@@ -73,7 +73,7 @@
   },
   "resolutions": {
     "@reown/appkit": "1.8.9",
-    "@hashgraph/hedera-wallet-connect": "2.0.3",
+    "@hashgraph/hedera-wallet-connect": "2.0.4-canary.3ca04e9.0",
     "@hashgraphonline/standards-sdk": "0.1.121-canary.0"
   },
   "packageManager": "pnpm@10.14.0+sha512.ad27a79641b49c3e481a16a805baa71817a04bbe06a38d17e60e2eaee83f6a146c6a688125f5792e48dd5ba30e7da52a5cda4c3992b9ccf333f9ce223af84748"

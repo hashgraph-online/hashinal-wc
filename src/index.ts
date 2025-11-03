@@ -61,6 +61,9 @@ class HashinalsWalletConnectSDK {
   private static instance: HashinalsWalletConnectSDK;
   private static dAppConnectorInstance: DAppConnector;
   private static proxyInstance: HashinalsWalletConnectSDK | null = null;
+  // Maximum number of node account IDs to use from the signer's network
+  // Using 3 nodes provides redundancy while keeping transaction overhead reasonable
+  private static readonly MAX_NODE_ACCOUNT_IDS = 3;
   private logger: Logger;
   private network: LedgerId;
   private extensionCheckInterval: NodeJS.Timeout | null = null;
@@ -214,6 +217,32 @@ class HashinalsWalletConnectSDK {
     const signer = this.dAppConnector.signers.find(
       (signer_) => signer_.getAccountId().toString() === accountId
     );
+
+    if (!signer) {
+      throw new Error('No signer available. Please ensure wallet is connected.');
+    }
+
+    // Ensure the transaction has node account IDs set before freezing
+    // This prevents the "nodeAccountId must be set" error
+    // Check if nodeAccountIds is null or empty array
+    const nodeAccountIds = tx.nodeAccountIds || [];
+    if (nodeAccountIds.length === 0) {
+      const network = signer.getNetwork();
+      if (!network) {
+        throw new Error('Signer network is not available. Please reconnect your wallet.');
+      }
+
+      const networkNodeIds = Object.values(network)
+        .filter((value) => value instanceof AccountId)
+        .slice(0, HashinalsWalletConnectSDK.MAX_NODE_ACCOUNT_IDS) as AccountId[];
+
+      if (networkNodeIds.length > 0) {
+        tx.setNodeAccountIds(networkNodeIds);
+      } else {
+        throw new Error('No node account IDs available from signer network.');
+      }
+    }
+
     if (!disableSigner) {
       const signedTx = await tx.freezeWithSigner(signer);
       const executedTx = await signedTx.executeWithSigner(signer);
