@@ -9,7 +9,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 env:
   NODE_VERSION: 20
@@ -32,6 +31,8 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: https://registry.npmjs.org
+          scope: '@hashgraphonline'
+          always-auth: true
           cache: pnpm
 
       - name: Install dependencies
@@ -42,8 +43,8 @@ jobs:
 
       - name: Publish
         env:
-          NPM_CONFIG_PROVENANCE: true
-        run: npm publish --access public --provenance
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
 
   canary:
     if: github.event_name == 'pull_request' && github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository
@@ -63,6 +64,8 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: https://registry.npmjs.org
+          scope: '@hashgraphonline'
+          always-auth: true
           cache: pnpm
 
       - name: Install dependencies
@@ -79,5 +82,5 @@ jobs:
 
       - name: Publish canary
         env:
-          NPM_CONFIG_PROVENANCE: true
-        run: npm publish --access public --tag canary --provenance
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --tag canary
