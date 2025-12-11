@@ -8,6 +8,7 @@ declare class HashinalsWalletConnectSDK {
     private static instance;
     private static dAppConnectorInstance;
     private static proxyInstance;
+    private static readonly MAX_NODE_ACCOUNT_IDS;
     private logger;
     private network;
     private extensionCheckInterval;
