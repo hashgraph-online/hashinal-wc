@@ -32,8 +32,6 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: https://registry.npmjs.org
-          scope: '@hashgraphonline'
-          always-auth: true
           cache: pnpm
 
       - name: Install dependencies
@@ -45,7 +43,6 @@ jobs:
       - name: Publish
         env:
           NPM_CONFIG_PROVENANCE: true
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public --provenance
 
   canary:
@@ -66,8 +63,6 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: https://registry.npmjs.org
-          scope: '@hashgraphonline'
-          always-auth: true
           cache: pnpm
 
       - name: Install dependencies
@@ -85,5 +80,4 @@ jobs:
       - name: Publish canary
         env:
           NPM_CONFIG_PROVENANCE: true
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public --tag canary --provenance
