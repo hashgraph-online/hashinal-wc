@@ -40,7 +40,7 @@ jobs:
         run: pnpm run build
 
       - name: Publish
-        run: pnpm publish --access public
+        run: pnpm publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -77,6 +77,6 @@ jobs:
           node -e "const fs = require('fs'); const pkg = require('./package.json'); pkg.version = '${CANARY_VERSION}'; fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');"
 
       - name: Publish canary
-        run: pnpm publish --access public --tag canary
+        run: pnpm publish --access public --tag canary --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
