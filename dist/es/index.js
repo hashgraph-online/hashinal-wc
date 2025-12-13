@@ -1,7 +1,8 @@
 import { Buffer } from "buffer";
 import * as HashgraphSDK from "@hashgraph/sdk";
-import { LedgerId, AccountId, TopicMessageSubmitTransaction, TopicId, TransferTransaction, TransactionId, Hbar, ContractExecuteTransaction, ContractId, TopicCreateTransaction, PrivateKey, TokenCreateTransaction, TokenType, TokenSupplyType, TokenMintTransaction, TokenId, AccountCreateTransaction, TokenAssociateTransaction, TokenDissociateTransaction, AccountUpdateTransaction, AccountAllowanceApproveTransaction } from "@hashgraph/sdk";
-import { DAppConnector, HederaJsonRpcMethod, HederaSessionEvent, HederaChainId } from "@hashgraph/hedera-wallet-connect";
+import { LedgerId, TopicMessageSubmitTransaction, TopicId, TransferTransaction, TransactionId, AccountId, Hbar, ContractExecuteTransaction, ContractId, TopicCreateTransaction, PrivateKey, TokenCreateTransaction, TokenType, TokenSupplyType, TokenMintTransaction, TokenId, AccountCreateTransaction, TokenAssociateTransaction, TokenDissociateTransaction, AccountUpdateTransaction, AccountAllowanceApproveTransaction } from "@hashgraph/sdk";
+import { createAppKit } from "@reown/appkit";
+import { HederaChainDefinition, HederaAdapter, hederaNamespace, HederaProvider, DAppConnector, HederaJsonRpcMethod, HederaSessionEvent, HederaChainId } from "@hashgraph/hedera-wallet-connect";
 import { base64StringToSignatureMap, prefixMessageToSign, verifyMessageSignature } from "@hashgraph/hedera-wallet-connect";
 import { Logger } from "./logger.js";
 import { fetchWithRetry } from "./utils/retry.js";
@@ -16,8 +17,11 @@ function ensureGlobalHTMLElement() {
   }
 }
 ensureGlobalHTMLElement();
+const HASH_PACK_WALLET_ID = "a29498d225fa4b13468ff4d6cf4ae0ea4adcbd95f07ce8a843a1dee10b632f3f";
 const _HashinalsWalletConnectSDK = class _HashinalsWalletConnectSDK {
   constructor(logger, network) {
+    this.reownAppKit = null;
+    this.reownAppKitKey = null;
     this.extensionCheckInterval = null;
     this.hasCalledExtensionCallback = false;
     this.logger = logger || new Logger();
@@ -61,6 +65,56 @@ const _HashinalsWalletConnectSDK = class _HashinalsWalletConnectSDK {
   getNetwork() {
     return this.network;
   }
+  setReownAppKit(appKit) {
+    this.reownAppKit = appKit;
+  }
+  async ensureReownAppKit(projectId, metadata, network) {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const key = `${projectId}:${network.toString()}`;
+    if (this.reownAppKit && this.reownAppKitKey === key) {
+      return;
+    }
+    try {
+      let defaultNetwork = HederaChainDefinition.Native.Mainnet;
+      if (network.toString() === "testnet") {
+        defaultNetwork = HederaChainDefinition.Native.Testnet;
+      }
+      const hederaNativeAdapter = new HederaAdapter({
+        projectId,
+        networks: [
+          HederaChainDefinition.Native.Mainnet,
+          HederaChainDefinition.Native.Testnet
+        ],
+        namespace: hederaNamespace
+      });
+      const universalProvider = await HederaProvider.init({
+        projectId,
+        metadata
+      });
+      this.reownAppKit = createAppKit({
+        adapters: [hederaNativeAdapter],
+        universalProvider,
+        projectId,
+        metadata,
+        networks: [
+          HederaChainDefinition.Native.Mainnet,
+          HederaChainDefinition.Native.Testnet
+        ],
+        defaultNetwork,
+        enableWalletGuide: false,
+        enableWallets: true,
+        featuredWalletIds: [HASH_PACK_WALLET_ID],
+        includeWalletIds: [HASH_PACK_WALLET_ID]
+      });
+      this.reownAppKitKey = key;
+    } catch (e) {
+      this.logger.warn("Failed to initialize Reown AppKit", e);
+      this.reownAppKit = null;
+      this.reownAppKitKey = null;
+    }
+  }
   setLogLevel(level) {
     if (this.logger instanceof Logger) {
       this.logger.setLogLevel(level);
@@ -84,6 +138,7 @@ const _HashinalsWalletConnectSDK = class _HashinalsWalletConnectSDK {
     await _HashinalsWalletConnectSDK.dAppConnectorInstance.init({
       logger: "error"
     });
+    await this.ensureReownAppKit(projectId, metadata, chosenNetwork);
     _HashinalsWalletConnectSDK.dAppConnectorInstance.onSessionIframeCreated = (session) => {
       this.logger.info("new session from from iframe", session);
       this.handleNewSession(session);
@@ -96,11 +151,37 @@ const _HashinalsWalletConnectSDK = class _HashinalsWalletConnectSDK {
     );
     return _HashinalsWalletConnectSDK.dAppConnectorInstance;
   }
-  async connect() {
+  async connect(options) {
     this.ensureInitialized();
-    const session = await this.dAppConnector.openModal();
+    const pairingTopic = options?.pairingTopic;
+    const appKit = this.reownAppKit;
+    if (appKit) {
+      const session2 = await this.connectUsingReownAppKit(appKit, pairingTopic);
+      this.handleNewSession(session2);
+      return session2;
+    }
+    const session = await this.dAppConnector.openModal(pairingTopic);
     this.handleNewSession(session);
     return session;
+  }
+  async connectUsingReownAppKit(appKit, pairingTopic) {
+    this.ensureInitialized();
+    if (!appKit) {
+      throw new Error("AppKit instance is required.");
+    }
+    try {
+      return await this.dAppConnector.connect((uri) => {
+        void appKit.open({ view: "Connect", uri }).catch((e) => {
+          this.logger.error("Failed to open Reown AppKit modal", e);
+        });
+      }, pairingTopic);
+    } finally {
+      try {
+        await appKit.close();
+      } catch (e) {
+        this.logger.warn("Failed to close Reown AppKit modal", e);
+      }
+    }
   }
   async disconnect() {
     try {
@@ -140,26 +221,22 @@ const _HashinalsWalletConnectSDK = class _HashinalsWalletConnectSDK {
     if (!signer) {
       throw new Error("No signer available. Please ensure wallet is connected.");
     }
-    const nodeAccountIds = tx.nodeAccountIds || [];
-    if (nodeAccountIds.length === 0) {
-      const network = signer.getNetwork();
-      if (!network) {
-        throw new Error("Signer network is not available. Please reconnect your wallet.");
+    try {
+      if (!disableSigner) {
+        const signedTx = await tx.freezeWithSigner(signer);
+        const executedTx2 = await signedTx.executeWithSigner(signer);
+        return await executedTx2.getReceiptWithSigner(signer);
       }
-      const networkNodeIds = Object.values(network).filter((value) => value instanceof AccountId).slice(0, _HashinalsWalletConnectSDK.MAX_NODE_ACCOUNT_IDS);
-      if (networkNodeIds.length > 0) {
-        tx.setNodeAccountIds(networkNodeIds);
-      } else {
-        throw new Error("No node account IDs available from signer network.");
-      }
-    }
-    if (!disableSigner) {
-      const signedTx = await tx.freezeWithSigner(signer);
-      const executedTx = await signedTx.executeWithSigner(signer);
-      return await executedTx.getReceiptWithSigner(signer);
-    } else {
       const executedTx = await tx.executeWithSigner(signer);
       return await executedTx.getReceiptWithSigner(signer);
+    } catch (e) {
+      const message = e.message ?? "";
+      if (message.toLowerCase().includes("nodeaccountid")) {
+        throw new Error(
+          "Transaction execution failed because nodeAccountId is not set. Set node account IDs on the transaction before calling executeTransaction."
+        );
+      }
+      throw e;
     }
   }
   async executeTransactionWithErrorHandling(tx, disableSigner) {
@@ -803,7 +880,6 @@ const _HashinalsWalletConnectSDK = class _HashinalsWalletConnectSDK {
   }
 };
 _HashinalsWalletConnectSDK.proxyInstance = null;
-_HashinalsWalletConnectSDK.MAX_NODE_ACCOUNT_IDS = 3;
 let HashinalsWalletConnectSDK = _HashinalsWalletConnectSDK;
 export {
   HashgraphSDK,

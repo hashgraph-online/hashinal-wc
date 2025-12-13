@@ -1,6 +1,6 @@
 {
   "name": "@hashgraphonline/hashinal-wc",
-  "version": "2.0.4",
+  "version": "2.0.12",
   "description": "The official Hashinal Wallet Connect SDK. A set of easy-to-use functions to interact with Hedera through Wallet Connect.",
   "type": "module",
   "files": [
@@ -30,15 +30,16 @@
     "build": "npm run clean && npm run build:umd && npm run build:es && npm run build:cjs && npm run build:ts",
     "build:ts": "tsc --emitDeclarationOnly --project tsconfig.json",
     "prepublish": "npm run build",
-    "publish": "npm publish --access public",
-    "publish:canary": "npm publish --access public --tag canary"
+    "release": "npm publish --access public",
+    "release:canary": "npm publish --access public --tag canary"
   },
   "dependencies": {
     "@hashgraph/hedera-wallet-connect": "2.0.4",
     "@hashgraph/proto": "^2.24.0",
     "@hashgraph/sdk": "^2.77.0",
-    "@hashgraphonline/standards-sdk": "0.1.141",
+    "@hashgraphonline/standards-sdk": "0.1.143-feat-adapter-registry.canary.661d80f.60",
     "@reown/appkit": "1.8.10",
+    "@walletconnect/modal": "^2.7.0",
     "fetch-retry": "^6.0.0",
     "long": "^5.2.3"
   },
@@ -69,7 +70,7 @@
     "vite-plugin-string-replace": "^1.1.5"
   },
   "resolutions": {
-    "@hashgraphonline/standards-sdk": "0.1.141"
+    "@hashgraphonline/standards-sdk": "0.1.143-feat-adapter-registry.canary.661d80f.60"
   },
   "packageManager": "pnpm@10.14.0+sha512.ad27a79641b49c3e481a16a805baa71817a04bbe06a38d17e60e2eaee83f6a146c6a688125f5792e48dd5ba30e7da52a5cda4c3992b9ccf333f9ce223af84748"
 }

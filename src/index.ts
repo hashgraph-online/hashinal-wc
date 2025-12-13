@@ -38,11 +38,17 @@ import {
   TokenId,
 } from '@hashgraph/sdk';
 import * as HashgraphSDK from '@hashgraph/sdk';
+import { createAppKit } from '@reown/appkit';
+import type { AppKit } from '@reown/appkit';
 import {
   HederaSessionEvent,
   HederaJsonRpcMethod,
   DAppConnector,
+  HederaProvider,
+  HederaAdapter,
+  HederaChainDefinition,
   HederaChainId,
+  hederaNamespace,
   SignMessageResult,
 } from '@hashgraph/hedera-wallet-connect';
 import {
@@ -57,15 +63,17 @@ import {
 import { Logger } from './logger';
 import { fetchWithRetry } from './utils/retry';
 
+const HASH_PACK_WALLET_ID =
+  'a29498d225fa4b13468ff4d6cf4ae0ea4adcbd95f07ce8a843a1dee10b632f3f';
+
 class HashinalsWalletConnectSDK {
   private static instance: HashinalsWalletConnectSDK;
   private static dAppConnectorInstance: DAppConnector;
   private static proxyInstance: HashinalsWalletConnectSDK | null = null;
-  // Maximum number of node account IDs to use from the signer's network
-  // Using 3 nodes provides redundancy while keeping transaction overhead reasonable
-  private static readonly MAX_NODE_ACCOUNT_IDS = 3;
   private logger: Logger;
   private network: LedgerId;
+  private reownAppKit: AppKit | null = null;
+  private reownAppKitKey: string | null = null;
   private extensionCheckInterval: NodeJS.Timeout | null = null;
   private hasCalledExtensionCallback: boolean = false;
 
@@ -121,6 +129,67 @@ class HashinalsWalletConnectSDK {
     return this.network;
   }
 
+  public setReownAppKit(appKit: AppKit | null): void {
+    this.reownAppKit = appKit;
+  }
+
+  private async ensureReownAppKit(
+    projectId: string,
+    metadata: SignClientTypes.Metadata,
+    network: LedgerId
+  ): Promise<void> {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const key = `${projectId}:${network.toString()}`;
+    if (this.reownAppKit && this.reownAppKitKey === key) {
+      return;
+    }
+
+    try {
+      let defaultNetwork = HederaChainDefinition.Native.Mainnet;
+      if (network.toString() === 'testnet') {
+        defaultNetwork = HederaChainDefinition.Native.Testnet;
+      }
+
+      const hederaNativeAdapter = new HederaAdapter({
+        projectId,
+        networks: [
+          HederaChainDefinition.Native.Mainnet,
+          HederaChainDefinition.Native.Testnet,
+        ],
+        namespace: hederaNamespace,
+      });
+
+      const universalProvider = await HederaProvider.init({
+        projectId,
+        metadata,
+      });
+
+      this.reownAppKit = createAppKit({
+        adapters: [hederaNativeAdapter],
+        universalProvider,
+        projectId,
+        metadata,
+        networks: [
+          HederaChainDefinition.Native.Mainnet,
+          HederaChainDefinition.Native.Testnet,
+        ],
+        defaultNetwork,
+        enableWalletGuide: false,
+        enableWallets: true,
+        featuredWalletIds: [HASH_PACK_WALLET_ID],
+        includeWalletIds: [HASH_PACK_WALLET_ID],
+      }) as AppKit;
+      this.reownAppKitKey = key;
+    } catch (e) {
+      this.logger.warn('Failed to initialize Reown AppKit', e);
+      this.reownAppKit = null;
+      this.reownAppKitKey = null;
+    }
+  }
+
   public setLogLevel(level: 'error' | 'warn' | 'info' | 'debug'): void {
     if (this.logger instanceof Logger) {
       this.logger.setLogLevel(level);
@@ -154,6 +223,8 @@ class HashinalsWalletConnectSDK {
       logger: 'error',
     });
 
+    await this.ensureReownAppKit(projectId, metadata, chosenNetwork);
+
     HashinalsWalletConnectSDK.dAppConnectorInstance.onSessionIframeCreated = (
       session
     ) => {
@@ -170,11 +241,46 @@ class HashinalsWalletConnectSDK {
     return HashinalsWalletConnectSDK.dAppConnectorInstance;
   }
 
-  public async connect(): Promise<SessionTypes.Struct> {
+  public async connect(options?: {
+    pairingTopic?: string;
+  }): Promise<SessionTypes.Struct> {
     this.ensureInitialized();
-    const session = await this.dAppConnector.openModal();
+    const pairingTopic = options?.pairingTopic;
+    const appKit = this.reownAppKit;
+    if (appKit) {
+      const session = await this.connectUsingReownAppKit(appKit, pairingTopic);
+      this.handleNewSession(session);
+      return session;
+    }
+
+    const session = await this.dAppConnector.openModal(pairingTopic);
     this.handleNewSession(session);
     return session;
+  }
+
+  private async connectUsingReownAppKit(
+    appKit: AppKit,
+    pairingTopic?: string
+  ): Promise<SessionTypes.Struct> {
+    this.ensureInitialized();
+    if (!appKit) {
+      throw new Error('AppKit instance is required.');
+    }
+    try {
+      return await this.dAppConnector.connect((uri) => {
+        void appKit
+          .open({ view: 'Connect', uri })
+          .catch((e) => {
+            this.logger.error('Failed to open Reown AppKit modal', e);
+          });
+      }, pairingTopic);
+    } finally {
+      try {
+        await appKit.close();
+      } catch (e) {
+        this.logger.warn('Failed to close Reown AppKit modal', e);
+      }
+    }
   }
 
   public async disconnect(): Promise<boolean> {
@@ -221,35 +327,22 @@ class HashinalsWalletConnectSDK {
     if (!signer) {
       throw new Error('No signer available. Please ensure wallet is connected.');
     }
-
-    // Ensure the transaction has node account IDs set before freezing
-    // This prevents the "nodeAccountId must be set" error
-    // Check if nodeAccountIds is null or empty array
-    const nodeAccountIds = tx.nodeAccountIds || [];
-    if (nodeAccountIds.length === 0) {
-      const network = signer.getNetwork();
-      if (!network) {
-        throw new Error('Signer network is not available. Please reconnect your wallet.');
+    try {
+      if (!disableSigner) {
+        const signedTx = await tx.freezeWithSigner(signer);
+        const executedTx = await signedTx.executeWithSigner(signer);
+        return await executedTx.getReceiptWithSigner(signer);
       }
-
-      const networkNodeIds = Object.values(network)
-        .filter((value) => value instanceof AccountId)
-        .slice(0, HashinalsWalletConnectSDK.MAX_NODE_ACCOUNT_IDS) as AccountId[];
-
-      if (networkNodeIds.length > 0) {
-        tx.setNodeAccountIds(networkNodeIds);
-      } else {
-        throw new Error('No node account IDs available from signer network.');
-      }
-    }
-
-    if (!disableSigner) {
-      const signedTx = await tx.freezeWithSigner(signer);
-      const executedTx = await signedTx.executeWithSigner(signer);
-      return await executedTx.getReceiptWithSigner(signer);
-    } else {
       const executedTx = await tx.executeWithSigner(signer);
       return await executedTx.getReceiptWithSigner(signer);
+    } catch (e) {
+      const message = (e as Error).message ?? '';
+      if (message.toLowerCase().includes('nodeaccountid')) {
+        throw new Error(
+          'Transaction execution failed because nodeAccountId is not set. Set node account IDs on the transaction before calling executeTransaction.'
+        );
+      }
+      throw e;
     }
   }
 

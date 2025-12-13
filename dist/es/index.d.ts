@@ -1,5 +1,6 @@
 import { SessionTypes, SignClientTypes } from '@walletconnect/types';
 import { Transaction, AccountId, ContractId, LedgerId, TransactionReceipt, ContractFunctionParameters, PrivateKey } from '@hashgraph/sdk';
+import { AppKit } from '@reown/appkit';
 import { DAppConnector } from '@hashgraph/hedera-wallet-connect';
 import { FetchMessagesResult, TokenBalance, HederaAccountResponse, HederaTXResponse, Nft } from './types';
 import { Logger } from './logger';
@@ -8,9 +9,10 @@ declare class HashinalsWalletConnectSDK {
     private static instance;
     private static dAppConnectorInstance;
     private static proxyInstance;
-    private static readonly MAX_NODE_ACCOUNT_IDS;
     private logger;
     private network;
+    private reownAppKit;
+    private reownAppKitKey;
     private extensionCheckInterval;
     private hasCalledExtensionCallback;
     get dAppConnector(): DAppConnector;
@@ -19,9 +21,14 @@ declare class HashinalsWalletConnectSDK {
     setLogger(logger: Logger): void;
     setNetwork(network: LedgerId): void;
     getNetwork(): LedgerId;
+    setReownAppKit(appKit: AppKit | null): void;
+    private ensureReownAppKit;
     setLogLevel(level: 'error' | 'warn' | 'info' | 'debug'): void;
     init(projectId: string, metadata: SignClientTypes.Metadata, network?: LedgerId, onSessionIframeCreated?: (session: SessionTypes.Struct) => void): Promise<DAppConnector>;
-    connect(): Promise<SessionTypes.Struct>;
+    connect(options?: {
+        pairingTopic?: string;
+    }): Promise<SessionTypes.Struct>;
+    private connectUsingReownAppKit;
     disconnect(): Promise<boolean>;
     disconnectAll(): Promise<boolean>;
     executeTransaction(tx: Transaction, disableSigner?: boolean): Promise<TransactionReceipt>;
