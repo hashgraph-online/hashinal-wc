@@ -25,14 +25,18 @@ declare class HashinalsWalletConnectSDK {
     network?: LedgerId
   ): HashinalsWalletConnectSDK;
   setLogger(logger: ILogger): void;
+  setNetwork(network: LedgerId): void;
+  getNetwork(): LedgerId;
   setLogLevel(level: 'error' | 'warn' | 'info' | 'debug'): void;
   init(
     projectId: string,
     metadata: SignClientTypes.Metadata,
-    network?: LedgerId
+    network?: LedgerId,
+    onSessionIframeCreated?: (session: SessionTypes.Struct) => void
   ): Promise<DAppConnector>;
-  connect(): Promise<SessionTypes.Struct>;
+  connect(options?: { pairingTopic?: string }): Promise<SessionTypes.Struct>;
   disconnect(): Promise<boolean>;
+  disconnectAll(): Promise<boolean>;
   private executeTransaction;
   submitMessageToTopic(
     topicId: string,
@@ -52,7 +56,7 @@ declare class HashinalsWalletConnectSDK {
   ): Promise<TransactionReceipt>;
   requestAccount(account: string): Promise<HederaAccountResponse>;
   getAccountBalance(): Promise<string>;
-  getAccountInfo(): Promise<string>;
+  getAccountInfo(): { accountId: string; network: LedgerId } | null;
   createTopic(
     memo?: string,
     adminKey?: string,
@@ -75,10 +79,11 @@ declare class HashinalsWalletConnectSDK {
   getMessages(
     topicId: string,
     lastTimestamp?: number,
-    disableTimestampFilter?: boolean
+    disableTimestampFilter?: boolean,
+    network?: string
   ): Promise<FetchMessagesResult>;
-  saveConnectionInfo(accountId: string | undefined): void;
-  loadConnectionInfo(): string | null;
+  saveConnectionInfo(accountId: string | undefined, connectedNetwork?: string): void;
+  loadConnectionInfo(): { accountId: string | null; network: string | null };
   connectWallet(
     PROJECT_ID: string,
     APP_METADATA: SignClientTypes.Metadata,
@@ -91,11 +96,15 @@ declare class HashinalsWalletConnectSDK {
   disconnectWallet(clearStorage?: boolean): Promise<boolean>;
   initAccount(
     PROJECT_ID: string,
-    APP_METADATA: SignClientTypes.Metadata
+    APP_METADATA: SignClientTypes.Metadata,
+    networkOverride?: LedgerId,
+    onSessionIframeCreated?: (session: SessionTypes.Struct) => void
   ): Promise<{
     accountId: string;
     balance: string;
   } | null>;
+  subscribeToExtensions(callback: (extension: any) => void): () => void;
+  connectViaDappBrowser(): Promise<void>;
   private ensureInitialized;
   static run(): void;
   transferToken(
@@ -126,7 +135,42 @@ declare class HashinalsWalletConnectSDK {
   getAccountTokens(accountId: string): Promise<{
     tokens: TokenBalance[];
   }>;
+  signMessage(
+    message: string,
+    options?: {
+      openWalletOnMobile?: boolean;
+      onMobileRedirect?: () => void;
+    }
+  ): Promise<{ userSignature: string }>;
 }
+
+/**
+ * Detect if current device is mobile
+ */
+declare function isMobileDevice(): boolean;
+
+/**
+ * Detect if device is iOS
+ */
+declare function isIOSDevice(): boolean;
+
+/**
+ * Detect if device is Android
+ */
+declare function isAndroidDevice(): boolean;
+
+/**
+ * Open HashPack app on mobile device.
+ * Used primarily for sign requests after a connection is already established.
+ * 
+ * @param wcUri - Optional WalletConnect URI to pass to HashPack
+ */
+declare function openHashPackOnMobile(wcUri?: string): Promise<void>;
+
+/**
+ * Get the appropriate app store URL for the current platform
+ */
+declare function getHashPackStoreUrl(): string;
 
 declare global {
   interface Window {
@@ -136,4 +180,13 @@ declare global {
 
 declare const __UMD__: boolean;
 
-export { HashinalsWalletConnectSDK, HashgraphSDK };
+export { 
+  HashinalsWalletConnectSDK, 
+  HashgraphSDK, 
+  isMobileDevice, 
+  isIOSDevice, 
+  isAndroidDevice,
+  openHashPackOnMobile,
+  getHashPackStoreUrl,
+};
+

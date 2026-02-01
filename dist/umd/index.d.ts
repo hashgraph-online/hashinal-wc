@@ -5,6 +5,40 @@ import { DAppConnector } from '@hashgraph/hedera-wallet-connect';
 import { FetchMessagesResult, TokenBalance, HederaAccountResponse, HederaTXResponse, Nft } from './types';
 import { Logger } from './logger';
 import * as HashgraphSDK from '@hashgraph/sdk';
+/**
+ * Detect if current device is mobile
+ */
+declare function isMobileDevice(): boolean;
+/**
+ * Detect if device is iOS
+ */
+declare function isIOSDevice(): boolean;
+/**
+ * Detect if device is Android
+ */
+declare function isAndroidDevice(): boolean;
+/**
+ * Get the appropriate app store URL for the current platform
+ */
+declare function getHashPackStoreUrl(): string;
+/**
+ * Open HashPack app on mobile device.
+ * Used primarily for sign requests after a connection is already established.
+ *
+ * Uses a hidden anchor element to trigger the deep link without navigating
+ * away from the current page. This ensures users can return to the dApp
+ * after signing in the wallet.
+ *
+ * @param wcUri - Optional WalletConnect URI to pass to HashPack
+ */
+declare function openHashPackOnMobile(wcUri?: string): Promise<void>;
+/**
+ * Check if there's a saved return URL from a wallet connection attempt.
+ * If found, returns the URL and clears it from storage.
+ *
+ * dApps should call this on page load and redirect if a URL is returned.
+ */
+declare function checkWalletReturnUrl(): string | null;
 declare class HashinalsWalletConnectSDK {
     private static instance;
     private static dAppConnectorInstance;
@@ -15,6 +49,7 @@ declare class HashinalsWalletConnectSDK {
     private reownAppKitKey;
     private extensionCheckInterval;
     private hasCalledExtensionCallback;
+    private useAppKit;
     get dAppConnector(): DAppConnector;
     constructor(logger?: Logger, network?: LedgerId);
     static getInstance(logger?: Logger, network?: LedgerId): HashinalsWalletConnectSDK;
@@ -24,13 +59,27 @@ declare class HashinalsWalletConnectSDK {
     setReownAppKit(appKit: AppKit | null): void;
     private ensureReownAppKit;
     setLogLevel(level: 'error' | 'warn' | 'info' | 'debug'): void;
-    init(projectId: string, metadata: SignClientTypes.Metadata, network?: LedgerId, onSessionIframeCreated?: (session: SessionTypes.Struct) => void): Promise<DAppConnector>;
+    init(projectId: string, metadata: SignClientTypes.Metadata, network?: LedgerId, onSessionIframeCreated?: (session: SessionTypes.Struct) => void, options?: {
+        useAppKit?: boolean;
+    }): Promise<DAppConnector>;
     connect(options?: {
         pairingTopic?: string;
+        onUri?: (uri: string) => void;
     }): Promise<SessionTypes.Struct>;
     private connectUsingReownAppKit;
     disconnect(): Promise<boolean>;
     disconnectAll(): Promise<boolean>;
+    /**
+     * Triggers the browser extension popup for signing on desktop.
+     * This is needed when the signer doesn't have an extensionId set
+     * (e.g., when connecting via the Reown AppKit modal).
+     */
+    private triggerExtensionPopupIfNeeded;
+    /**
+     * Gets the available desktop browser extension (e.g., HashPack).
+     * Returns undefined if no extension is available or on mobile devices.
+     */
+    private getAvailableDesktopExtension;
     executeTransaction(tx: Transaction, disableSigner?: boolean): Promise<TransactionReceipt>;
     executeTransactionWithErrorHandling(tx: Transaction, disableSigner: boolean): Promise<{
         result?: TransactionReceipt;
@@ -51,21 +100,39 @@ declare class HashinalsWalletConnectSDK {
     createToken(name: string, symbol: string, initialSupply: number, decimals: number, treasuryAccountId: string, adminKey: string, supplyKey: string): Promise<string>;
     mintNFT(tokenId: string, metadata: string, supplyKey: PrivateKey): Promise<TransactionReceipt>;
     getMessages(topicId: string, lastTimestamp?: number, disableTimestampFilter?: boolean, network?: string): Promise<FetchMessagesResult>;
-    signMessage(message: string): Promise<{
-        userSignature: any;
+    /**
+     * Sign a message with the connected wallet.
+     * On mobile devices, this will automatically open the HashPack app
+     * to prompt the user to sign the message.
+     *
+     * @param message - The message to sign
+     * @param options - Optional configuration for signing
+     * @param options.openWalletOnMobile - Whether to open the wallet app on mobile (default: true)
+     * @param options.onMobileRedirect - Callback before redirecting to wallet on mobile
+     */
+    signMessage(message: string, options?: {
+        openWalletOnMobile?: boolean;
+        onMobileRedirect?: () => void;
+    }): Promise<{
+        userSignature: string;
     }>;
     private saveConnectionInfo;
     loadConnectionInfo(): {
         accountId: string | null;
         network: string | null;
     };
-    connectWallet(PROJECT_ID: string, APP_METADATA: SignClientTypes.Metadata, network?: LedgerId): Promise<{
+    connectWallet(PROJECT_ID: string, APP_METADATA: SignClientTypes.Metadata, network?: LedgerId, options?: {
+        onUri?: (uri: string) => void;
+        useAppKit?: boolean;
+    }): Promise<{
         accountId: string;
         balance: string;
         session: SessionTypes.Struct;
     }>;
     disconnectWallet(clearStorage?: boolean): Promise<boolean>;
-    initAccount(PROJECT_ID: string, APP_METADATA: SignClientTypes.Metadata, networkOverride?: LedgerId, onSessionIframeCreated?: (session: SessionTypes.Struct) => void): Promise<{
+    initAccount(PROJECT_ID: string, APP_METADATA: SignClientTypes.Metadata, networkOverride?: LedgerId, onSessionIframeCreated?: (session: SessionTypes.Struct) => void, options?: {
+        useAppKit?: boolean;
+    }): Promise<{
         accountId: string;
         balance: string;
     } | null>;
@@ -91,4 +158,4 @@ declare class HashinalsWalletConnectSDK {
 }
 export * from './types';
 export * from './sign';
-export { HashinalsWalletConnectSDK, HashgraphSDK };
+export { HashinalsWalletConnectSDK, HashgraphSDK, isMobileDevice, isIOSDevice, isAndroidDevice, openHashPackOnMobile, getHashPackStoreUrl, checkWalletReturnUrl, };

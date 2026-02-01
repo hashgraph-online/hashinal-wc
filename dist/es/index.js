@@ -2,7 +2,7 @@ import { Buffer } from "buffer";
 import * as HashgraphSDK from "@hashgraph/sdk";
 import { LedgerId, TopicMessageSubmitTransaction, TopicId, TransferTransaction, TransactionId, AccountId, Hbar, ContractExecuteTransaction, ContractId, TopicCreateTransaction, PrivateKey, TokenCreateTransaction, TokenType, TokenSupplyType, TokenMintTransaction, TokenId, AccountCreateTransaction, TokenAssociateTransaction, TokenDissociateTransaction, AccountUpdateTransaction, AccountAllowanceApproveTransaction } from "@hashgraph/sdk";
 import { createAppKit } from "@reown/appkit";
-import { HederaChainDefinition, HederaAdapter, hederaNamespace, HederaProvider, DAppConnector, HederaJsonRpcMethod, HederaSessionEvent, HederaChainId } from "@hashgraph/hedera-wallet-connect";
+import { HederaChainDefinition, HederaAdapter, hederaNamespace, HederaProvider, DAppConnector, HederaJsonRpcMethod, HederaSessionEvent, HederaChainId, extensionOpen } from "@hashgraph/hedera-wallet-connect";
 import { base64StringToSignatureMap, prefixMessageToSign, verifyMessageSignature } from "@hashgraph/hedera-wallet-connect";
 import { Logger } from "./logger.js";
 import { fetchWithRetry } from "./utils/retry.js";
@@ -18,12 +18,138 @@ function ensureGlobalHTMLElement() {
 }
 ensureGlobalHTMLElement();
 const HASH_PACK_WALLET_ID = "a29498d225fa4b13468ff4d6cf4ae0ea4adcbd95f07ce8a843a1dee10b632f3f";
+const HASHPACK_EXTENSION_ID = "gjagmgiddbbciopjhllkdnddhcglnemk";
+const HASHPACK_DEEP_LINK = "https://link.hashpack.app";
+const HASHPACK_STORE_URLS = {
+  ios: "https://apps.apple.com/app/hashpack/id1646514851",
+  android: "https://play.google.com/store/apps/details?id=app.hashpack.wallet",
+  fallback: "https://www.hashpack.app/"
+};
+const WALLET_RETURN_URL_KEY = "hashinal_wc_return_url";
+function isMobileDevice() {
+  if (typeof window === "undefined" || typeof navigator === "undefined") {
+    return false;
+  }
+  const userAgent = navigator.userAgent || navigator.vendor || window.opera || "";
+  return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
+}
+function isIOSDevice() {
+  if (typeof navigator === "undefined") return false;
+  return /iphone|ipad|ipod/i.test(navigator.userAgent.toLowerCase());
+}
+function isAndroidDevice() {
+  if (typeof navigator === "undefined") return false;
+  return /android/i.test(navigator.userAgent.toLowerCase());
+}
+function getHashPackDeepLink(wcUri) {
+  if (wcUri) {
+    return `${HASHPACK_DEEP_LINK}/wc?uri=${encodeURIComponent(wcUri)}`;
+  }
+  return `${HASHPACK_DEEP_LINK}/wc`;
+}
+function getHashPackStoreUrl() {
+  if (isIOSDevice()) return HASHPACK_STORE_URLS.ios;
+  if (isAndroidDevice()) return HASHPACK_STORE_URLS.android;
+  return HASHPACK_STORE_URLS.fallback;
+}
+function patchSignersWithExtensionId(dAppConnector, extensionId = HASHPACK_EXTENSION_ID) {
+  if (!dAppConnector?.signers?.length) return;
+  if (isMobileDevice()) return;
+  for (const signer of dAppConnector.signers) {
+    if (!signer.extensionId) {
+      signer.extensionId = extensionId;
+    }
+  }
+}
+async function openHashPackOnMobile(wcUri) {
+  if (typeof window === "undefined" || typeof document === "undefined") return;
+  try {
+    sessionStorage.setItem(WALLET_RETURN_URL_KEY, window.location.href);
+  } catch {
+  }
+  const deepLink = getHashPackDeepLink(wcUri);
+  const anchor = document.createElement("a");
+  anchor.href = deepLink;
+  anchor.style.display = "none";
+  anchor.setAttribute("target", "_blank");
+  anchor.setAttribute("rel", "noopener noreferrer");
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  await new Promise((resolve) => setTimeout(resolve, 500));
+}
+let windowOpenPatched = false;
+let originalWindowOpen = null;
+function patchWindowOpenForMobileWalletLinks() {
+  if (windowOpenPatched) return;
+  if (typeof window === "undefined") return;
+  try {
+    originalWindowOpen = window.open.bind(window);
+    window.open = function(url, target, features) {
+      const urlString = url?.toString() || "";
+      const isWalletDeepLink = urlString.includes("link.hashpack.app") || urlString.includes("wallet.hashpack.app") || urlString.includes("wc?uri=");
+      if (isMobileDevice() && isWalletDeepLink && (target === "_self" || target === "_top")) {
+        try {
+          sessionStorage.setItem(WALLET_RETURN_URL_KEY, window.location.href);
+        } catch {
+        }
+        try {
+          const newWindow = originalWindowOpen(urlString, "_blank", "noopener,noreferrer");
+          if (newWindow) {
+            return newWindow;
+          }
+        } catch {
+        }
+        try {
+          const anchor = document.createElement("a");
+          anchor.href = urlString;
+          anchor.target = "_blank";
+          anchor.rel = "noopener noreferrer";
+          anchor.style.cssText = "position:fixed;top:-9999px;left:-9999px;";
+          document.body.appendChild(anchor);
+          const clickEvent = new MouseEvent("click", {
+            view: window,
+            bubbles: true,
+            cancelable: true
+          });
+          anchor.dispatchEvent(clickEvent);
+          setTimeout(() => {
+            try {
+              document.body.removeChild(anchor);
+            } catch {
+            }
+          }, 100);
+          return null;
+        } catch {
+        }
+        window.location.href = urlString;
+        return null;
+      }
+      return originalWindowOpen(url, target, features);
+    };
+    windowOpenPatched = true;
+  } catch {
+  }
+}
+function checkWalletReturnUrl() {
+  if (typeof window === "undefined") return null;
+  try {
+    const returnUrl = sessionStorage.getItem(WALLET_RETURN_URL_KEY);
+    if (returnUrl) {
+      sessionStorage.removeItem(WALLET_RETURN_URL_KEY);
+      return returnUrl;
+    }
+  } catch {
+  }
+  return null;
+}
 const _HashinalsWalletConnectSDK = class _HashinalsWalletConnectSDK {
   constructor(logger, network) {
     this.reownAppKit = null;
     this.reownAppKitKey = null;
     this.extensionCheckInterval = null;
     this.hasCalledExtensionCallback = false;
+    this.useAppKit = false;
     this.logger = logger || new Logger();
     this.network = network || LedgerId.MAINNET;
   }
@@ -77,38 +203,94 @@ const _HashinalsWalletConnectSDK = class _HashinalsWalletConnectSDK {
       return;
     }
     try {
-      let defaultNetwork = HederaChainDefinition.Native.Mainnet;
-      if (network.toString() === "testnet") {
-        defaultNetwork = HederaChainDefinition.Native.Testnet;
-      }
-      const hederaNativeAdapter = new HederaAdapter({
+      const isTestnet = network.toString() === "testnet";
+      const defaultNetwork = isTestnet ? HederaChainDefinition.Native.Testnet : HederaChainDefinition.Native.Mainnet;
+      const nativeHederaAdapter = new HederaAdapter({
         projectId,
-        networks: [
-          HederaChainDefinition.Native.Mainnet,
-          HederaChainDefinition.Native.Testnet
-        ],
+        networks: isTestnet ? [HederaChainDefinition.Native.Testnet, HederaChainDefinition.Native.Mainnet] : [HederaChainDefinition.Native.Mainnet, HederaChainDefinition.Native.Testnet],
         namespace: hederaNamespace
       });
-      const universalProvider = await HederaProvider.init({
+      const eip155HederaAdapter = new HederaAdapter({
         projectId,
-        metadata
+        networks: isTestnet ? [HederaChainDefinition.EVM.Testnet, HederaChainDefinition.EVM.Mainnet] : [HederaChainDefinition.EVM.Mainnet, HederaChainDefinition.EVM.Testnet],
+        namespace: "eip155"
       });
+      const providerOpts = {
+        projectId,
+        metadata,
+        optionalNamespaces: {
+          eip155: {
+            methods: [
+              "eth_sendTransaction",
+              "eth_signTransaction",
+              "eth_sign",
+              "personal_sign",
+              "eth_signTypedData",
+              "eth_signTypedData_v4",
+              "eth_accounts",
+              "eth_chainId"
+            ],
+            chains: isTestnet ? ["eip155:296", "eip155:295"] : ["eip155:295", "eip155:296"],
+            events: ["chainChanged", "accountsChanged"],
+            rpcMap: {
+              "eip155:296": "https://testnet.hashio.io/api",
+              "eip155:295": "https://mainnet.hashio.io/api"
+            }
+          },
+          hedera: {
+            methods: [
+              "hedera_getNodeAddresses",
+              "hedera_executeTransaction",
+              "hedera_signMessage",
+              "hedera_signAndExecuteQuery",
+              "hedera_signAndExecuteTransaction",
+              "hedera_signTransaction"
+            ],
+            chains: isTestnet ? ["hedera:testnet", "hedera:mainnet"] : ["hedera:mainnet", "hedera:testnet"],
+            events: ["chainChanged", "accountsChanged"]
+          }
+        }
+      };
+      const universalProvider = await HederaProvider.init(providerOpts);
       this.reownAppKit = createAppKit({
-        adapters: [hederaNativeAdapter],
+        adapters: [nativeHederaAdapter, eip155HederaAdapter],
         universalProvider,
         projectId,
         metadata,
         networks: [
           HederaChainDefinition.Native.Mainnet,
-          HederaChainDefinition.Native.Testnet
+          HederaChainDefinition.Native.Testnet,
+          HederaChainDefinition.EVM.Mainnet,
+          HederaChainDefinition.EVM.Testnet
         ],
         defaultNetwork,
-        enableWalletGuide: false,
+        enableWalletGuide: true,
         enableWallets: true,
+        enableReconnect: true,
+        enableWalletConnect: false,
+        allWallets: "HIDE",
         featuredWalletIds: [HASH_PACK_WALLET_ID],
-        includeWalletIds: [HASH_PACK_WALLET_ID]
+        features: {
+          analytics: true,
+          socials: false,
+          swaps: false,
+          onramp: false,
+          email: false
+        },
+        themeVariables: {
+          "--w3m-accent": "#5599fe"
+        },
+        chainImages: {
+          "hedera:testnet": "https://arweave.net/mBqmJSvl4wGWbUv3XbMHmwpjlVzO2zZCY9xPQWMwBxw",
+          "hedera:mainnet": "https://arweave.net/mBqmJSvl4wGWbUv3XbMHmwpjlVzO2zZCY9xPQWMwBxw",
+          "eip155:296": "https://arweave.net/mBqmJSvl4wGWbUv3XbMHmwpjlVzO2zZCY9xPQWMwBxw",
+          "eip155:295": "https://arweave.net/mBqmJSvl4wGWbUv3XbMHmwpjlVzO2zZCY9xPQWMwBxw"
+        },
+        termsConditionsUrl: metadata.url ? `${metadata.url}/legal/terms` : void 0,
+        privacyPolicyUrl: metadata.url ? `${metadata.url}/legal/privacy` : void 0
       });
       this.reownAppKitKey = key;
+      patchWindowOpenForMobileWalletLinks();
     } catch (e) {
       this.logger.warn("Failed to initialize Reown AppKit", e);
       this.reownAppKit = null;
@@ -120,7 +302,9 @@ const _HashinalsWalletConnectSDK = class _HashinalsWalletConnectSDK {
       this.logger.setLogLevel(level);
     }
   }
-  async init(projectId, metadata, network, onSessionIframeCreated) {
+  async init(projectId, metadata, network, onSessionIframeCreated, options) {
+    patchWindowOpenForMobileWalletLinks();
+    this.useAppKit = options?.useAppKit ?? false;
     const chosenNetwork = network || this.network;
     const isMainnet = chosenNetwork.toString() === "mainnet";
     if (_HashinalsWalletConnectSDK.dAppConnectorInstance) {
@@ -138,10 +322,13 @@ const _HashinalsWalletConnectSDK = class _HashinalsWalletConnectSDK {
     await _HashinalsWalletConnectSDK.dAppConnectorInstance.init({
       logger: "error"
     });
-    await this.ensureReownAppKit(projectId, metadata, chosenNetwork);
+    if (this.useAppKit) {
+      await this.ensureReownAppKit(projectId, metadata, chosenNetwork);
+    }
     _HashinalsWalletConnectSDK.dAppConnectorInstance.onSessionIframeCreated = (session) => {
       this.logger.info("new session from from iframe", session);
       this.handleNewSession(session);
+      patchSignersWithExtensionId(_HashinalsWalletConnectSDK.dAppConnectorInstance);
       if (onSessionIframeCreated) {
         onSessionIframeCreated(session);
       }
@@ -149,39 +336,121 @@ const _HashinalsWalletConnectSDK = class _HashinalsWalletConnectSDK {
     this.logger.info(
       `Hedera Wallet Connect SDK initialized on ${chosenNetwork}`
     );
+    patchSignersWithExtensionId(_HashinalsWalletConnectSDK.dAppConnectorInstance);
     return _HashinalsWalletConnectSDK.dAppConnectorInstance;
   }
   async connect(options) {
     this.ensureInitialized();
     const pairingTopic = options?.pairingTopic;
-    const appKit = this.reownAppKit;
+    const appKit = this.useAppKit ? this.reownAppKit : null;
     if (appKit) {
-      const session2 = await this.connectUsingReownAppKit(appKit, pairingTopic);
+      const session2 = await this.connectUsingReownAppKit(
+        appKit,
+        pairingTopic,
+        options?.onUri
+      );
       this.handleNewSession(session2);
+      patchSignersWithExtensionId(this.dAppConnector);
       return session2;
     }
+    const availableExtension = this.getAvailableDesktopExtension();
+    if (availableExtension?.id) {
+      this.logger.info("Desktop extension available, connecting directly...");
+      try {
+        const session2 = await this.dAppConnector.connectExtension(
+          availableExtension.id,
+          pairingTopic
+        );
+        this.handleNewSession(session2);
+        patchSignersWithExtensionId(this.dAppConnector);
+        return session2;
+      } catch (e) {
+        this.logger.warn("Direct extension connection failed, falling back to modal", e);
+      }
+    }
+    if (isMobileDevice()) {
+      this.logger.info("Mobile device detected, using HashPack deep link...");
+      const session2 = await this.dAppConnector.connect(
+        (uri) => {
+          openHashPackOnMobile(uri);
+        },
+        pairingTopic,
+        void 0
+      );
+      this.handleNewSession(session2);
+      patchSignersWithExtensionId(this.dAppConnector);
+      return session2;
+    }
+    this.logger.info("Opening DAppConnector modal...");
     const session = await this.dAppConnector.openModal(pairingTopic);
     this.handleNewSession(session);
+    patchSignersWithExtensionId(this.dAppConnector);
     return session;
   }
-  async connectUsingReownAppKit(appKit, pairingTopic) {
+  async connectUsingReownAppKit(appKit, pairingTopic, onUri) {
     this.ensureInitialized();
     if (!appKit) {
       throw new Error("AppKit instance is required.");
     }
-    try {
-      return await this.dAppConnector.connect((uri) => {
-        void appKit.open({ view: "Connect", uri }).catch((e) => {
-          this.logger.error("Failed to open Reown AppKit modal", e);
-        });
-      }, pairingTopic);
-    } finally {
+    const availableExtension = this.getAvailableDesktopExtension();
+    if (availableExtension?.id) {
+      this.logger.info("Desktop extension available, connecting directly...");
       try {
-        await appKit.close();
+        const session = await this.dAppConnector.connectExtension(
+          availableExtension.id,
+          pairingTopic
+        );
+        return session;
       } catch (e) {
-        this.logger.warn("Failed to close Reown AppKit modal", e);
+        this.logger.warn(
+          "Direct extension connection failed, falling back to AppKit modal",
+          e
+        );
       }
     }
+    if (isMobileDevice()) {
+      this.logger.info("Mobile device detected, using HashPack deep link...");
+      return await this.dAppConnector.connect(
+        (uri) => {
+          openHashPackOnMobile(uri);
+        },
+        pairingTopic,
+        void 0
+      );
+    }
+    this.logger.info("Desktop without extension, opening AppKit Connect modal...");
+    await appKit.open({ view: "Connect" });
+    return new Promise((resolve, reject) => {
+      let resolved = false;
+      const checkInterval = setInterval(() => {
+        const signers = this.dAppConnector?.signers || [];
+        if (signers.length > 0) {
+          const session = this.dAppConnector?.walletConnectClient?.session?.getAll()?.[0];
+          if (session && !resolved) {
+            resolved = true;
+            clearInterval(checkInterval);
+            void appKit.close().catch(() => {
+            });
+            resolve(session);
+          }
+        }
+      }, 500);
+      setTimeout(() => {
+        if (!resolved) {
+          clearInterval(checkInterval);
+          void appKit.close().catch(() => {
+          });
+          reject(new Error("Connection timeout - no wallet connected"));
+        }
+      }, 5 * 60 * 1e3);
+      const unsubscribe = appKit.subscribeState?.((state) => {
+        if (state.open === false && !resolved) {
+          clearInterval(checkInterval);
+          unsubscribe?.();
+          reject(new Error("Connection cancelled - modal closed"));
+        }
+      });
+    });
   }
   async disconnect() {
     try {
@@ -211,6 +480,35 @@ const _HashinalsWalletConnectSDK = class _HashinalsWalletConnectSDK {
       return false;
     }
   }
+  /**
+   * Triggers the browser extension popup for signing on desktop.
+   * This is needed when the signer doesn't have an extensionId set
+   * (e.g., when connecting via the Reown AppKit modal).
+   */
+  triggerExtensionPopupIfNeeded() {
+    if (isMobileDevice()) {
+      return;
+    }
+    const availableExtension = this.getAvailableDesktopExtension();
+    if (availableExtension) {
+      this.logger.debug(
+        "Triggering extension popup for signing",
+        availableExtension.id
+      );
+      extensionOpen(availableExtension.id);
+    }
+  }
+  /**
+   * Gets the available desktop browser extension (e.g., HashPack).
+   * Returns undefined if no extension is available or on mobile devices.
+   */
+  getAvailableDesktopExtension() {
+    if (isMobileDevice()) {
+      return void 0;
+    }
+    const extensions = this.dAppConnector?.extensions || [];
+    return extensions.find((ext) => ext.available && !ext.availableInIframe);
+  }
   async executeTransaction(tx, disableSigner = false) {
     this.ensureInitialized();
     const accountInfo = this.getAccountInfo();
@@ -220,6 +518,12 @@ const _HashinalsWalletConnectSDK = class _HashinalsWalletConnectSDK {
     );
     if (!signer) {
       throw new Error("No signer available. Please ensure wallet is connected.");
+    }
+    if (isMobileDevice()) {
+      this.logger.info("Mobile device detected, opening HashPack app for transaction signing...");
+      await openHashPackOnMobile();
+    } else if (!signer.extensionId) {
+      this.triggerExtensionPopupIfNeeded();
     }
     try {
       if (!disableSigner) {
@@ -483,21 +787,54 @@ const _HashinalsWalletConnectSDK = class _HashinalsWalletConnectSDK {
       };
     }
   }
-  async signMessage(message) {
+  /**
+   * Sign a message with the connected wallet.
+   * On mobile devices, this will automatically open the HashPack app
+   * to prompt the user to sign the message.
+   * 
+   * @param message - The message to sign
+   * @param options - Optional configuration for signing
+   * @param options.openWalletOnMobile - Whether to open the wallet app on mobile (default: true)
+   * @param options.onMobileRedirect - Callback before redirecting to wallet on mobile
+   */
+  async signMessage(message, options) {
     const dAppConnector = this.dAppConnector;
     if (!dAppConnector) {
       throw new Error("No active connection or signer");
     }
     const accountInfo = this.getAccountInfo();
     const accountId = accountInfo?.accountId;
+    if (!accountId) {
+      throw new Error("No account connected. Please connect your wallet first.");
+    }
     const params = {
       signerAccountId: `hedera:${this.network}:${accountId}`,
       message
     };
-    const result = await dAppConnector.signMessage(
-      params
-    );
-    return { userSignature: result.signatureMap };
+    const shouldOpenWallet = options?.openWalletOnMobile !== false;
+    if (shouldOpenWallet && isMobileDevice()) {
+      this.logger.info("Mobile device detected, opening HashPack app for signing...");
+      options?.onMobileRedirect?.();
+      await openHashPackOnMobile();
+    } else if (!isMobileDevice()) {
+      this.triggerExtensionPopupIfNeeded();
+    }
+    try {
+      const result = await dAppConnector.signMessage(
+        params
+      );
+      return { userSignature: result.signatureMap };
+    } catch (error) {
+      if (isMobileDevice()) {
+        const originalError = error.message || String(error);
+        if (originalError.toLowerCase().includes("timeout") || originalError.toLowerCase().includes("reject") || originalError.toLowerCase().includes("user")) {
+          throw new Error(
+            `Signing failed. Please make sure HashPack is open and try again. (${originalError})`
+          );
+        }
+      }
+      throw error;
+    }
   }
   saveConnectionInfo(accountId, connectedNetwork) {
     if (!accountId) {
@@ -515,10 +852,10 @@ const _HashinalsWalletConnectSDK = class _HashinalsWalletConnectSDK {
       network: localStorage.getItem("connectedNetwork")
     };
   }
-  async connectWallet(PROJECT_ID, APP_METADATA, network) {
+  async connectWallet(PROJECT_ID, APP_METADATA, network, options) {
     try {
-      await this.init(PROJECT_ID, APP_METADATA, network);
-      const session = await this.connect();
+      await this.init(PROJECT_ID, APP_METADATA, network, void 0, { useAppKit: options?.useAppKit });
+      const session = await this.connect({ onUri: options?.onUri });
       const accountInfo = this.getAccountInfo();
       const accountId = accountInfo?.accountId;
       const balance = await this.getAccountBalance();
@@ -548,7 +885,7 @@ const _HashinalsWalletConnectSDK = class _HashinalsWalletConnectSDK {
     }
   }
   async initAccount(PROJECT_ID, APP_METADATA, networkOverride, onSessionIframeCreated = () => {
-  }) {
+  }, options) {
     const { accountId: savedAccountId, network: savedNetwork } = this.loadConnectionInfo();
     if (savedAccountId && savedNetwork) {
       try {
@@ -558,7 +895,8 @@ const _HashinalsWalletConnectSDK = class _HashinalsWalletConnectSDK {
           PROJECT_ID,
           APP_METADATA,
           network,
-          onSessionIframeCreated
+          onSessionIframeCreated,
+          { useAppKit: options?.useAppKit }
         );
         const balance = await this.getAccountBalance();
         return {
@@ -580,7 +918,8 @@ const _HashinalsWalletConnectSDK = class _HashinalsWalletConnectSDK {
           PROJECT_ID,
           APP_METADATA,
           networkOverride,
-          onSessionIframeCreated
+          onSessionIframeCreated,
+          { useAppKit: options?.useAppKit }
         );
         this.logger.info("initialized", networkOverride);
         await this.connectViaDappBrowser();
@@ -887,6 +1226,12 @@ export {
   Name,
   Result,
   base64StringToSignatureMap,
+  checkWalletReturnUrl,
+  getHashPackStoreUrl,
+  isAndroidDevice,
+  isIOSDevice,
+  isMobileDevice,
+  openHashPackOnMobile,
   prefixMessageToSign,
   verifyMessageSignature
 };

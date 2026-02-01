@@ -1,6 +1,6 @@
 {
   "name": "@hashgraphonline/hashinal-wc",
-  "version": "2.0.12",
+  "version": "2.0.58",
   "description": "The official Hashinal Wallet Connect SDK. A set of easy-to-use functions to interact with Hedera through Wallet Connect.",
   "type": "module",
   "files": [
@@ -12,34 +12,33 @@
   "exports": {
     ".": {
       "import": {
-        "types": "./dist/index.d.ts",
+        "types": "./dist/es/index.d.ts",
         "default": "./dist/es/index.js"
       },
       "require": {
-        "types": "./dist/index.d.ts",
+        "types": "./dist/es/index.d.ts",
         "default": "./dist/cjs/hashinal-wc.cjs"
       }
     }
   },
-  "types": "./dist/index.d.ts",
+  "types": "./dist/es/index.d.ts",
   "scripts": {
     "clean": "rimraf dist",
     "build:es": "BUILD_FORMAT=es vite build",
     "build:umd": "BUILD_FORMAT=umd vite build",
     "build:cjs": "node scripts/generate-cjs-stub.mjs",
-    "build": "npm run clean && npm run build:umd && npm run build:es && npm run build:cjs && npm run build:ts",
+    "build": "pnpm run clean && pnpm run build:umd && pnpm run build:es && pnpm run build:cjs",
     "build:ts": "tsc --emitDeclarationOnly --project tsconfig.json",
-    "prepublish": "npm run build",
-    "release": "npm publish --access public",
-    "release:canary": "npm publish --access public --tag canary"
+    "prepublish": "pnpm run build",
+    "release": "pnpm publish --access public",
+    "release:canary": "pnpm publish --access public --tag canary"
   },
   "dependencies": {
     "@hashgraph/hedera-wallet-connect": "2.0.4",
-    "@hashgraph/proto": "^2.24.0",
-    "@hashgraph/sdk": "^2.77.0",
-    "@hashgraphonline/standards-sdk": "0.1.143-feat-adapter-registry.canary.661d80f.60",
-    "@reown/appkit": "1.8.10",
-    "@walletconnect/modal": "^2.7.0",
+    "@hashgraph/proto": "^2.25.0",
+    "@hashgraph/sdk": "^2.78.0",
+    "@hashgraphonline/standards-sdk": "0.1.152",
+    "@reown/appkit": "1.8.17",
     "fetch-retry": "^6.0.0",
     "long": "^5.2.3"
   },
@@ -70,7 +69,21 @@
     "vite-plugin-string-replace": "^1.1.5"
   },
   "resolutions": {
-    "@hashgraphonline/standards-sdk": "0.1.143-feat-adapter-registry.canary.661d80f.60"
+    "@hashgraphonline/standards-sdk": "0.1.152"
+  },
+  "pnpm": {
+    "overrides": {
+      "@reown/appkit": "1.8.17",
+      "@reown/appkit-pay": "1.8.17",
+      "@reown/appkit-common": "1.8.17",
+      "@reown/appkit-controllers": "1.8.17",
+      "@reown/appkit-scaffold-ui": "1.8.17",
+      "@reown/appkit-ui": "1.8.17",
+      "@reown/appkit-utils": "1.8.17",
+      "@reown/appkit-polyfills": "1.8.17",
+      "@reown/appkit-wallet": "1.8.17",
+      "@walletconnect/universal-provider": "2.23.2"
+    }
   },
   "packageManager": "pnpm@10.14.0+sha512.ad27a79641b49c3e481a16a805baa71817a04bbe06a38d17e60e2eaee83f6a146c6a688125f5792e48dd5ba30e7da52a5cda4c3992b9ccf333f9ce223af84748"
 }
