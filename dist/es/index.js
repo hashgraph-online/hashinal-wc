@@ -87,7 +87,7 @@ function patchWindowOpenForMobileWalletLinks() {
     originalWindowOpen = window.open.bind(window);
     window.open = function(url, target, features) {
       const urlString = url?.toString() || "";
-      const isWalletDeepLink = urlString.includes("link.hashpack.app") || urlString.includes("wallet.hashpack.app") || urlString.includes("wc?uri=");
+      const isWalletDeepLink = urlString.includes("link.hashpack.app") || urlString.includes("wallet.hashpack.app");
       if (isMobileDevice() && isWalletDeepLink && (target === "_self" || target === "_top")) {
         try {
           sessionStorage.setItem(WALLET_RETURN_URL_KEY, window.location.href);
@@ -307,10 +307,11 @@ const _HashinalsWalletConnectSDK = class _HashinalsWalletConnectSDK {
     this.useAppKit = options?.useAppKit ?? false;
     const chosenNetwork = network || this.network;
     const isMainnet = chosenNetwork.toString() === "mainnet";
-    if (_HashinalsWalletConnectSDK.dAppConnectorInstance) {
-      return _HashinalsWalletConnectSDK.dAppConnectorInstance;
+    const existingConnector = _HashinalsWalletConnectSDK.dAppConnectorInstance;
+    if (existingConnector?.walletConnectClient) {
+      return existingConnector;
     }
-    _HashinalsWalletConnectSDK.dAppConnectorInstance = new DAppConnector(
+    const dAppConnector = new DAppConnector(
       metadata,
       chosenNetwork,
       projectId,
@@ -319,9 +320,10 @@ const _HashinalsWalletConnectSDK = class _HashinalsWalletConnectSDK {
       [isMainnet ? HederaChainId.Mainnet : HederaChainId.Testnet],
       "debug"
     );
-    await _HashinalsWalletConnectSDK.dAppConnectorInstance.init({
+    await dAppConnector.init({
       logger: "error"
     });
+    _HashinalsWalletConnectSDK.dAppConnectorInstance = dAppConnector;
     if (this.useAppKit) {
       await this.ensureReownAppKit(projectId, metadata, chosenNetwork);
     }
@@ -983,8 +985,8 @@ const _HashinalsWalletConnectSDK = class _HashinalsWalletConnectSDK {
     }
   }
   ensureInitialized() {
-    if (!this.dAppConnector) {
-      throw new Error("SDK not initialized. Call init() first.");
+    if (!this.dAppConnector?.walletConnectClient) {
+      throw new Error("WalletConnect is not initialized");
     }
   }
   static run() {

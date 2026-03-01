@@ -243,8 +243,7 @@ function patchWindowOpenForMobileWalletLinks(): void {
     ): WindowProxy | null {
       const urlString = url?.toString() || '';
       const isWalletDeepLink = urlString.includes('link.hashpack.app') || 
-                               urlString.includes('wallet.hashpack.app') ||
-                               urlString.includes('wc?uri=');
+                               urlString.includes('wallet.hashpack.app');
       
       if (isMobileDevice() && isWalletDeepLink && (target === '_self' || target === '_top')) {
         try {
@@ -555,17 +554,17 @@ class HashinalsWalletConnectSDK {
   ): Promise<DAppConnector> {
     patchWindowOpenForMobileWalletLinks();
     
-    // Store useAppKit preference (default false for simple HashPack-only modal)
     this.useAppKit = options?.useAppKit ?? false;
     
     const chosenNetwork = network || this.network;
     const isMainnet = chosenNetwork.toString() === 'mainnet';
 
-    if (HashinalsWalletConnectSDK.dAppConnectorInstance) {
-      return HashinalsWalletConnectSDK.dAppConnectorInstance;
+    const existingConnector = HashinalsWalletConnectSDK.dAppConnectorInstance;
+    if (existingConnector?.walletConnectClient) {
+      return existingConnector;
     }
 
-    HashinalsWalletConnectSDK.dAppConnectorInstance = new DAppConnector(
+    const dAppConnector = new DAppConnector(
       metadata,
       chosenNetwork,
       projectId,
@@ -575,11 +574,12 @@ class HashinalsWalletConnectSDK {
       'debug'
     );
 
-    await HashinalsWalletConnectSDK.dAppConnectorInstance.init({
+    await dAppConnector.init({
       logger: 'error',
     });
 
-    // Only initialize AppKit if explicitly requested (for MetaMask/EVM wallet support)
+    HashinalsWalletConnectSDK.dAppConnectorInstance = dAppConnector;
+
     if (this.useAppKit) {
       await this.ensureReownAppKit(projectId, metadata, chosenNetwork);
     }
@@ -589,7 +589,6 @@ class HashinalsWalletConnectSDK {
     ) => {
       this.logger.info('new session from from iframe', session);
       this.handleNewSession(session);
-      // Patch signers created from iframe session
       patchSignersWithExtensionId(HashinalsWalletConnectSDK.dAppConnectorInstance);
       if (onSessionIframeCreated) {
         onSessionIframeCreated(session);
@@ -600,7 +599,6 @@ class HashinalsWalletConnectSDK {
       `Hedera Wallet Connect SDK initialized on ${chosenNetwork}`
     );
     
-    // Patch any restored session signers to have extensionId for desktop extension popup
     patchSignersWithExtensionId(HashinalsWalletConnectSDK.dAppConnectorInstance);
     
     return HashinalsWalletConnectSDK.dAppConnectorInstance;
@@ -1476,8 +1474,8 @@ class HashinalsWalletConnectSDK {
   }
 
   private ensureInitialized(): void {
-    if (!this.dAppConnector) {
-      throw new Error('SDK not initialized. Call init() first.');
+    if (!this.dAppConnector?.walletConnectClient) {
+      throw new Error('WalletConnect is not initialized');
     }
   }
 
